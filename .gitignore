@@ -1,0 +1,6 @@
+node_modules/
+.env
+infra/.deploy.env
+server/seed/seed-output.json
+npm-debug.log
+.DS_Store

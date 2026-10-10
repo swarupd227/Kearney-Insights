@@ -1,0 +1,60 @@
+{
+  "version": "1.0.0",
+  "random_seed": 20261013,
+  "description": "Seed manifest for Astra Insights for Kearney (orals demo). Lists the real constraints the seed must honour and the patterns planted so the five storylines work. Values generated from this manifest are demonstration data and carry the Seeded badge.",
+  "clock": { "today": "2026-10-13", "first_month": "2024-01-01", "last_closed_month": "2026-09-01", "fiscal_year": "calendar" },
+  "real_constraints": {
+    "headcount": "One seeded person per Schedule M user ID per office (6,637), with the Schedule M employee and contractor split per office (5,651 employees, 986 contractors).",
+    "partners": "Firm-wide partner count about 300, consistent with the public figure.",
+    "revenue_scale": "Seeded 2025 net fee revenue scaled to about US$2.05 billion, consistent with the public statement of more than US$2 billion. Not Kearney's figure.",
+    "clients": "The six publicly reported clients appear by name with their public work only; every other client is an identifier (C-0001...).",
+    "people_names": "No person names. People are identifiers (P-00001...).",
+    "seoul": "Schedule M shows 362 user IDs in Seoul, all contractors. Kept as given."
+  },
+  "scale": {
+    "revenue_2025_usd": 2050000000,
+    "growth_2024_to_2025": 1.11,
+    "plan_growth_2026": 1.10,
+    "actual_growth_2026_by_region": { "AMER": 1.11, "EUR": 1.05, "APAC": 1.14, "MEA": 1.16 },
+    "seasonality": { "1": 0.92, "2": 0.96, "3": 1.06, "4": 1.0, "5": 1.02, "6": 1.07, "7": 0.97, "8": 0.88, "9": 1.05, "10": 1.04, "11": 1.06, "12": 0.97 },
+    "client_service_share_of_employees": 0.74,
+    "shared_services_hubs": { "GGN": 0.55, "BLR": 0.65, "WAW": 0.6 },
+    "pyramid": { "PARTNER": 0.082, "AP": 0.06, "PRINCIPAL": 0.13, "MANAGER": 0.21, "ASSOCIATE": 0.31, "BA": 0.208 },
+    "unit_rate_factor": { "NA": 1.25, "LATAM": 0.6, "DACH": 1.15, "UKI": 1.15, "FRBNL": 1.05, "NORD": 1.1, "SEUR": 0.85, "CEE": 0.6, "IND": 0.38, "JPN": 1.0, "KOR": 0.55, "GCN": 0.7, "SEA": 0.9, "ANZ": 1.05, "ME": 1.3, "AFR": 0.7, "TUR": 0.55 }
+  },
+  "planted_patterns": {
+    "storyline_A_europe_gap": {
+      "description": "Europe runs behind plan in 2026 with several drivers: the DACH realisation decline, fewer engagement starts in UK and Ireland from June 2026, and low utilisation in the Nordics.",
+      "unit_actual_factor_2026": { "DACH": 0.97, "UKI": 0.94, "NORD": 0.96, "FRBNL": 1.02, "SEUR": 1.03, "CEE": 1.04 },
+      "uki_start_slip_from": "2026-06-01",
+      "nord_utilisation_gap_points": -8
+    },
+    "storyline_B_dach_realisation": {
+      "description": "Billing realisation in DACH falls in Q3 2026 (Jul–Sep) against Q2, concentrated in five engagements. Two of them trend to overrun.",
+      "unit": "DACH",
+      "quarter": "2026-Q3",
+      "engagements": [
+        { "id": "E-1182", "fee_model": "fixed", "write_off": 0.14, "overrun": 0.18, "discount": 0.06, "trend_overrun": true },
+        { "id": "E-1207", "fee_model": "fixed", "write_off": 0.1, "overrun": 0.14, "discount": 0.05, "trend_overrun": true },
+        { "id": "E-1159", "fee_model": "tm", "write_off": 0.1, "overrun": 0.0, "discount": 0.15, "trend_overrun": false },
+        { "id": "E-1231", "fee_model": "tm", "write_off": 0.04, "overrun": 0.0, "discount": 0.13, "trend_overrun": false },
+        { "id": "E-1244", "fee_model": "fixed", "write_off": 0.06, "overrun": 0.07, "discount": 0.03, "trend_overrun": false }
+      ]
+    },
+    "storyline_C_lic_white_space": {
+      "description": "Life Insurance Corporation of India has purchase history in Transformation (and one Organization engagement). Financial Services peers who bought Transformation commonly also bought Digital and Analytics, so the next-best practice model proposes Digital and Analytics.",
+      "client": "LIC", "bought": ["TRF", "ORG"], "expected_next_best": "DA",
+      "peer_pattern": { "industry": "FS", "co_purchase": ["TRF", "DA"], "strength": 0.7 }
+    },
+    "storyline_D_talent_cluster": {
+      "description": "A cluster of higher flight-risk scores among Principals in the Middle East unit, driven by time since promotion and sustained hours.",
+      "unit": "ME", "level": "PRINCIPAL", "share_affected": 0.6,
+      "months_in_level_min": 40, "sustained_weeks_min": 6
+    },
+    "storyline_E_real_tickets": {
+      "description": "Service-desk volumes by application come from the RFP pack ticket extracts and carry no Seeded badge. The demo build ships a sample file at data/servicenow_tickets.csv; replace it with the extract before the orals.",
+      "file": "data/servicenow_tickets.csv"
+    }
+  },
+  "labelling": "Every seeded value carries the name of the connector stub that produced it (stub:sap, stub:iem, stub:peoplesoft, stub:salesforce, stub:anaplan, stub:kyriba, stub:glean, stub:staffing, stub:graph). The calculation drawer shows the stub name."
+}

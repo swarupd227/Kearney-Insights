@@ -1,0 +1,34 @@
+// Settings: connect a language model (Azure OpenAI, OpenAI or Anthropic Claude) and set UI preferences.
+import { state, api, h, screenHead, toast } from '../ui.js';
+const PROVIDERS = [
+  { id: 'none', name: 'None (deterministic agents only)', hint: 'Every agent still runs; narratives come from templates and the Conductor uses the dictionary parser.' },
+  { id: 'anthropic', name: 'Anthropic Claude', hint: 'Official SDK. Key from console.anthropic.com. Model ID such as claude-opus-5-5, claude-sonnet-5-5 or claude-haiku-5-5.', needsEndpoint: false, modelLabel: 'Model ID' },
+  { id: 'azure-openai', name: 'Azure OpenAI', hint: 'Resource endpoint such as https://<resource>.openai.azure.com and the deployment name. In-tenant option named in the specification.', needsEndpoint: true, modelLabel: 'Deployment name', apiVersion: true },
+  { id: 'openai', name: 'OpenAI', hint: 'Key from platform.openai.com. Model such as gpt-4o-mini or gpt-4.1. Endpoint can stay empty.', needsEndpoint: 'optional', modelLabel: 'Model' }
+];
+export async function render(root) {
+  const s = await api('settings');
+  const f = { provider: s.llm.provider, endpoint: s.llm.endpoint, model: s.llm.model, apiVersion: s.llm.apiVersion, apiKey: '' };
+  const status = h('div', { class: 'card', style: { background: 'var(--surface-2)' } }, h('div', { style: { display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' } }, h('span', { class: 'badge ' + (s.status.configured ? 'real' : '') }, s.status.configured ? `Connected: ${s.status.label}` : 'No language model connected'), h('span', { class: 'muted small' }, s.status.configured ? `Source: ${s.status.source}${s.status.keyMasked ? ' · key ' + s.status.keyMasked : ''}` : 'The sixteen agents run deterministically until a provider is connected.'), s.status.lastError ? h('span', { class: 'badge block', title: s.status.lastError.at }, `Last call failed: ${s.status.lastError.message}${s.status.paused ? ' · paused for a minute' : ''}`) : null));
+  const testOut = h('div', { class: 'small', style: { marginTop: '8px', minHeight: '20px' } });
+  const field = (label, key, type = 'text', placeholder = '') => { const inp = h('input', { type, value: f[key] || '', placeholder, autocomplete: 'off', style: { width: '100%', background: 'var(--surface-2)', border: '1px solid var(--border-2)', borderRadius: '9px', padding: '8px 10px', color: 'var(--text)' }, onInput: e => { f[key] = e.target.value; } }); return h('label', { class: 'small', style: { display: 'block', marginBottom: '10px' } }, h('div', { class: 'muted', style: { marginBottom: '4px' } }, label), inp); };
+  const dyn = h('div');
+  const providerSel = h('select', { class: 'btn small', style: { marginBottom: '10px' }, onChange: e => { f.provider = e.target.value; if (!f.model) f.model = s.llm.defaults[f.provider] || ''; drawDyn(); } }, ...PROVIDERS.map(p => h('option', { value: p.id, selected: p.id === f.provider }, p.name)));
+  function drawDyn() {
+    const p = PROVIDERS.find(x => x.id === f.provider);
+    dyn.replaceChildren(h('div', { class: 'muted small', style: { margin: '0 0 10px' } }, p.hint));
+    if (p.id === 'none') return;
+    if (p.needsEndpoint) dyn.appendChild(field(p.needsEndpoint === 'optional' ? 'Endpoint (optional)' : 'Endpoint', 'endpoint', 'text', p.id === 'azure-openai' ? 'https://my-resource.openai.azure.com' : 'https://api.openai.com'));
+    dyn.appendChild(field(p.modelLabel, 'model', 'text', s.llm.defaults[p.id]));
+    if (p.apiVersion) dyn.appendChild(field('API version', 'apiVersion', 'text', '2024-10-21'));
+    dyn.appendChild(field(s.llm.hasKey && s.llm.provider === p.id ? `API key (stored: ${s.llm.keyMasked}; leave empty to keep)` : 'API key', 'apiKey', 'password', 'paste the key'));
+  }
+  drawDyn();
+  const save = async () => { await api('settings', { body: { persona: state.persona.id, llm: { provider: f.provider, endpoint: f.endpoint, model: f.model, apiVersion: f.apiVersion, apiKey: f.apiKey || undefined } } }); toast('Saved. The key is stored server-side and never returned to the browser.'); document.dispatchEvent(new CustomEvent('astra:settings-changed')); render(root); };
+  const test = async () => { testOut.textContent = 'Testing…'; const r = await api('settings/test', { body: { llm: { provider: f.provider, endpoint: f.endpoint, model: f.model, apiVersion: f.apiVersion, apiKey: f.apiKey || undefined } } }); testOut.replaceChildren(r.ok ? h('span', { class: 'good' }, `✓ ${r.provider} · ${r.model} answered “${r.reply}” in ${r.ms} ms`) : h('span', { class: 'bad' }, `✗ ${r.error}`)); };
+  const llmCard = h('div', { class: 'card' }, h('h3', {}, 'Language model'), h('div', { class: 'sub' }, 'Used by the Conductor to plan every question, by the Briefing Agent for the spoken answer (every number is checked against the Query Agent’s results) and for conversational questions. The analytical agents remain statistical models on the firm’s data.'), h('div', { class: 'muted small', style: { marginBottom: '4px' } }, 'Provider'), providerSel, dyn, h('div', { class: 'card-foot' }, h('button', { class: 'btn primary small', onClick: save }, 'Save'), h('button', { class: 'btn small', onClick: test }, 'Test connection'), f.provider !== 'none' && s.llm.hasKey ? h('button', { class: 'btn ghost small', onClick: async () => { await api('settings', { body: { persona: state.persona.id, llm: { provider: 'none', clearKey: true } } }); toast('Disconnected'); document.dispatchEvent(new CustomEvent('astra:settings-changed')); render(root); } }, 'Disconnect') : null), testOut);
+  const prov = h('label', { class: 'small', style: { display: 'flex', gap: '8px', alignItems: 'center' } }, h('input', { type: 'checkbox', checked: s.ui.provenance, style: { accentColor: 'var(--accent)' }, onChange: async e => { await api('settings', { body: { persona: state.persona.id, ui: { provenance: e.target.checked } } }); document.dispatchEvent(new CustomEvent('astra:settings-changed')); toast(e.target.checked ? 'Provenance badges on' : 'Provenance badges off'); } }), 'Show provenance badges on cards (connector stub or sourced). The calculation drawer always names the source.');
+  const uiCard = h('div', { class: 'card' }, h('h3', {}, 'Interface'), h('div', { class: 'sub' }, 'Theme is switched from the top bar (☀ / ☾) and remembered per browser.'), prov);
+  const env = h('div', { class: 'card flat' }, h('div', { class: 'muted small' }, 'Environment variables are the fallback when nothing is saved here: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT; ANTHROPIC_API_KEY, ANTHROPIC_MODEL; OPENAI_API_KEY, OPENAI_MODEL. Settings saved here take precedence. Changes are recorded in the audit trail.'));
+  root.replaceChildren(screenHead('Settings', 'Language model connection and interface preferences'), status, h('div', { class: 'grid cols-2', style: { marginTop: '16px' } }, llmCard, uiCard), env);
+}

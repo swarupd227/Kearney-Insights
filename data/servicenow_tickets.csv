@@ -1,0 +1,94 @@
+# ServiceNow ticket volumes by application and month.
+# REPLACE THIS SAMPLE with the RFP pack ticket extracts (Attachment C.3 and the ServiceNow extracts) before the orals.
+# Set source=rfp-pack:ticket-extract for real rows; the product then shows them without a Seeded badge.
+month,application,incidents,requests,source
+2026-01-01,Microsoft 365 and Teams,1380,2210,sample:replace-with-rfp-extract
+2026-01-01,SAP S/4HANA (FOCUS),410,620,sample:replace-with-rfp-extract
+2026-01-01,Salesforce,260,390,sample:replace-with-rfp-extract
+2026-01-01,PeopleSoft,310,540,sample:replace-with-rfp-extract
+2026-01-01,IEM time entry,520,180,sample:replace-with-rfp-extract
+2026-01-01,Concur,290,330,sample:replace-with-rfp-extract
+2026-01-01,End-user devices,960,1410,sample:replace-with-rfp-extract
+2026-01-01,Network and VPN,610,240,sample:replace-with-rfp-extract
+2026-01-01,Power BI,140,210,sample:replace-with-rfp-extract
+2026-01-01,Glean and Beehive,120,90,sample:replace-with-rfp-extract
+2026-02-01,Microsoft 365 and Teams,1290,2050,sample:replace-with-rfp-extract
+2026-02-01,SAP S/4HANA (FOCUS),430,590,sample:replace-with-rfp-extract
+2026-02-01,Salesforce,240,370,sample:replace-with-rfp-extract
+2026-02-01,PeopleSoft,290,510,sample:replace-with-rfp-extract
+2026-02-01,IEM time entry,480,160,sample:replace-with-rfp-extract
+2026-02-01,Concur,270,310,sample:replace-with-rfp-extract
+2026-02-01,End-user devices,910,1350,sample:replace-with-rfp-extract
+2026-02-01,Network and VPN,580,220,sample:replace-with-rfp-extract
+2026-02-01,Power BI,150,220,sample:replace-with-rfp-extract
+2026-02-01,Glean and Beehive,110,80,sample:replace-with-rfp-extract
+2026-03-01,Microsoft 365 and Teams,1410,2300,sample:replace-with-rfp-extract
+2026-03-01,SAP S/4HANA (FOCUS),470,660,sample:replace-with-rfp-extract
+2026-03-01,Salesforce,280,410,sample:replace-with-rfp-extract
+2026-03-01,PeopleSoft,330,560,sample:replace-with-rfp-extract
+2026-03-01,IEM time entry,540,190,sample:replace-with-rfp-extract
+2026-03-01,Concur,300,350,sample:replace-with-rfp-extract
+2026-03-01,End-user devices,990,1460,sample:replace-with-rfp-extract
+2026-03-01,Network and VPN,640,250,sample:replace-with-rfp-extract
+2026-03-01,Power BI,160,240,sample:replace-with-rfp-extract
+2026-03-01,Glean and Beehive,130,100,sample:replace-with-rfp-extract
+2026-04-01,Microsoft 365 and Teams,1350,2180,sample:replace-with-rfp-extract
+2026-04-01,SAP S/4HANA (FOCUS),440,630,sample:replace-with-rfp-extract
+2026-04-01,Salesforce,250,400,sample:replace-with-rfp-extract
+2026-04-01,PeopleSoft,300,530,sample:replace-with-rfp-extract
+2026-04-01,IEM time entry,500,170,sample:replace-with-rfp-extract
+2026-04-01,Concur,280,340,sample:replace-with-rfp-extract
+2026-04-01,End-user devices,940,1400,sample:replace-with-rfp-extract
+2026-04-01,Network and VPN,600,230,sample:replace-with-rfp-extract
+2026-04-01,Power BI,150,230,sample:replace-with-rfp-extract
+2026-04-01,Glean and Beehive,120,90,sample:replace-with-rfp-extract
+2026-05-01,Microsoft 365 and Teams,1320,2120,sample:replace-with-rfp-extract
+2026-05-01,SAP S/4HANA (FOCUS),420,610,sample:replace-with-rfp-extract
+2026-05-01,Salesforce,250,380,sample:replace-with-rfp-extract
+2026-05-01,PeopleSoft,310,520,sample:replace-with-rfp-extract
+2026-05-01,IEM time entry,490,170,sample:replace-with-rfp-extract
+2026-05-01,Concur,270,330,sample:replace-with-rfp-extract
+2026-05-01,End-user devices,930,1380,sample:replace-with-rfp-extract
+2026-05-01,Network and VPN,590,230,sample:replace-with-rfp-extract
+2026-05-01,Power BI,140,220,sample:replace-with-rfp-extract
+2026-05-01,Glean and Beehive,120,90,sample:replace-with-rfp-extract
+2026-06-01,Microsoft 365 and Teams,1400,2260,sample:replace-with-rfp-extract
+2026-06-01,SAP S/4HANA (FOCUS),460,650,sample:replace-with-rfp-extract
+2026-06-01,Salesforce,270,400,sample:replace-with-rfp-extract
+2026-06-01,PeopleSoft,320,550,sample:replace-with-rfp-extract
+2026-06-01,IEM time entry,530,180,sample:replace-with-rfp-extract
+2026-06-01,Concur,310,360,sample:replace-with-rfp-extract
+2026-06-01,End-user devices,970,1440,sample:replace-with-rfp-extract
+2026-06-01,Network and VPN,620,240,sample:replace-with-rfp-extract
+2026-06-01,Power BI,160,240,sample:replace-with-rfp-extract
+2026-06-01,Glean and Beehive,130,100,sample:replace-with-rfp-extract
+2026-07-01,Microsoft 365 and Teams,1250,2010,sample:replace-with-rfp-extract
+2026-07-01,SAP S/4HANA (FOCUS),400,580,sample:replace-with-rfp-extract
+2026-07-01,Salesforce,230,360,sample:replace-with-rfp-extract
+2026-07-01,PeopleSoft,290,500,sample:replace-with-rfp-extract
+2026-07-01,IEM time entry,470,160,sample:replace-with-rfp-extract
+2026-07-01,Concur,260,320,sample:replace-with-rfp-extract
+2026-07-01,End-user devices,890,1330,sample:replace-with-rfp-extract
+2026-07-01,Network and VPN,560,220,sample:replace-with-rfp-extract
+2026-07-01,Power BI,130,200,sample:replace-with-rfp-extract
+2026-07-01,Glean and Beehive,110,80,sample:replace-with-rfp-extract
+2026-08-01,Microsoft 365 and Teams,1180,1900,sample:replace-with-rfp-extract
+2026-08-01,SAP S/4HANA (FOCUS),380,550,sample:replace-with-rfp-extract
+2026-08-01,Salesforce,220,340,sample:replace-with-rfp-extract
+2026-08-01,PeopleSoft,280,480,sample:replace-with-rfp-extract
+2026-08-01,IEM time entry,450,150,sample:replace-with-rfp-extract
+2026-08-01,Concur,250,300,sample:replace-with-rfp-extract
+2026-08-01,End-user devices,850,1280,sample:replace-with-rfp-extract
+2026-08-01,Network and VPN,540,210,sample:replace-with-rfp-extract
+2026-08-01,Power BI,120,190,sample:replace-with-rfp-extract
+2026-08-01,Glean and Beehive,100,80,sample:replace-with-rfp-extract
+2026-09-01,Microsoft 365 and Teams,1430,2310,sample:replace-with-rfp-extract
+2026-09-01,SAP S/4HANA (FOCUS),480,670,sample:replace-with-rfp-extract
+2026-09-01,Salesforce,290,420,sample:replace-with-rfp-extract
+2026-09-01,PeopleSoft,340,570,sample:replace-with-rfp-extract
+2026-09-01,IEM time entry,550,190,sample:replace-with-rfp-extract
+2026-09-01,Concur,310,360,sample:replace-with-rfp-extract
+2026-09-01,End-user devices,1000,1480,sample:replace-with-rfp-extract
+2026-09-01,Network and VPN,650,260,sample:replace-with-rfp-extract
+2026-09-01,Power BI,170,250,sample:replace-with-rfp-extract
+2026-09-01,Glean and Beehive,140,110,sample:replace-with-rfp-extract

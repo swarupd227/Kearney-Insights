@@ -1,0 +1,15 @@
+// Screen 11: pipeline and win room. Funnel, weighted pipeline against plan, opportunities by win probability, stalled deals.
+import { state, api, h, ask, renderVisual, renderTable, screenHead, seededBadge, F } from '../ui.js';
+export async function render(root, params) {
+  const q = new URLSearchParams(); const region = params.region || state.persona.scope.region; if (region) q.set('region', region); if (params.practice || state.persona.scope.practice) q.set('practice', params.practice || state.persona.scope.practice);
+  const d = await api('screens/pipeline?' + q.toString());
+  const r = d.room;
+  const sel = h('select', { class: 'btn small', onChange: e => { location.hash = '#/pipeline/' + (e.target.value ? 'region=' + e.target.value : 'region='); } }, h('option', { value: '' }, 'Whole firm'), ...state.ref.regions.map(x => h('option', { value: x.id, selected: x.id === region }, x.name)));
+  const tiles = h('div', { class: 'grid cols-4' }, tile('Open pipeline', F(r.total, 'money'), `${r.funnel.reduce((a, s) => a + s.count, 0)} opportunities`), tile('Weighted pipeline', F(r.weighted, 'money'), 'Value × win probability'), tile('Coverage, next two quarters', r.coverage !== null ? r.coverage.toFixed(1) + 'x' : '–', r.need !== null ? `${F(r.need, 'money')} of plan not covered by booked work` : 'Plan is held by unit'), tile('Stalled deals', String(r.stalled.length), 'No activity for 30 days'));
+  const funnel = renderVisual(r.visual);
+  const win = renderVisual({ type: 'bar', title: 'Win rate by practice', subtitle: 'Decided in the last twelve months', x: d.winByPractice.map(x => x.label), keys: d.winByPractice.map(x => x.key), dim: 'practice', series: [{ name: 'Win rate', data: d.winByPractice.map(x => x.value) }], format: 'pct', horizontal: true, seeded: true, lineage: r.visual.lineage });
+  const ranked = renderTable(r.table, { onRow: o => ask(`Why is ${o.id} likely to be won?`) });
+  const stalled = renderTable({ title: 'Stalled deals', subtitle: 'Largest first', columns: [['id', 'Opportunity'], ['client_name', 'Client'], ['stage', 'Stage'], ['value', 'Value', 'money'], ['win_prob', 'Win probability', 'pct'], ['last_activity', 'Last activity']], rows: r.stalled, lineage: r.visual.lineage });
+  root.replaceChildren(screenHead('Pipeline and win room', 'Partners, practice chairs · Pipeline and Win Agent (model 3) and Forecast Agent', sel), tiles, h('div', { class: 'card flat', style: { padding: '12px 0 4px' } }, r.narrative), h('div', { class: 'grid cols-2' }, funnel, win), h('div', { class: 'grid cols-2', style: { marginTop: '16px' } }, ranked, stalled), h('div', { class: 'chips', style: { marginTop: '12px' } }, ...['What is our pipeline coverage for Q1 in Europe?', 'Which large deals have not moved for 30 days?', 'Which of my opportunities are most likely to close this quarter?'].map(x => h('button', { class: 'chip', onClick: () => ask(x) }, '✦ ' + x))));
+}
+function tile(name, value, sub) { return h('div', { class: 'tile', style: { cursor: 'default' } }, h('div', { class: 'name' }, h('span', {}, name), seededBadge(true)), h('div', { class: 'value' }, value), h('div', { class: 'delta muted' }, sub)); }
