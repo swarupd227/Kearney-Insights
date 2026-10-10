@@ -14,18 +14,19 @@
 # Generated names and the database password are kept in infra/.deploy.env (git-ignored) so re-runs are idempotent.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+echo "==> Astra Insights for Kearney: Azure deployment ($(date -u +%H:%M:%S) UTC)"
 
 SUBSCRIPTION=${SUBSCRIPTION:-Microsoft Azure Sponsorship}
 PREFIX=${PREFIX:-astra}
 LOCATION=${LOCATION:-westeurope}
 RG=${RG:-rg-${PREFIX}-insights}
 ENVFILE=infra/.deploy.env
-[ -f "$ENVFILE" ] && source "$ENVFILE"
-SUFFIX=${SUFFIX:-$(tr -dc a-z0-9 </dev/urandom | head -c 5)}
+if [ -f "$ENVFILE" ]; then source "$ENVFILE"; echo "==> Re-using settings from $ENVFILE"; fi
+SUFFIX=${SUFFIX:-$(openssl rand -hex 8 | cut -c1-5)}
 ACR=${ACR:-acr${PREFIX}${SUFFIX}}
 PG_SERVER=${PG_SERVER:-pg-${PREFIX}-${SUFFIX}}
 PG_ADMIN=${PG_ADMIN:-astraadmin}
-PG_PASSWORD=${PG_PASSWORD:-$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 24)}
+PG_PASSWORD=${PG_PASSWORD:-$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | cut -c1-24)}
 PG_DB=${PG_DB:-astra}
 CAE=${CAE:-cae-${PREFIX}-${SUFFIX}}
 APP=${APP:-ca-${PREFIX}-insights}
