@@ -121,4 +121,5 @@ router.get('/speech/token', wrap(async (req, res) => {
 }));
 
 router.use('/screens', screens);
+router.use('/export', require('./export'));
 module.exports = router;

@@ -1,5 +1,18 @@
 // Shared UI primitives: API client, element builder, visual and table rendering, lineage drawer, point-and-ask.
-import { render as renderChart, f as fmtValue, fmt } from './charts.js';
+import { render as renderChart, f as fmtValue, fmt, chartImage } from './charts.js';
+
+// Slide export: posts the answer (headline, chart image, table, lineage) to the server, which returns a .pptx to download.
+export async function exportSlide(a, card) {
+  const chartEl = card ? card.querySelector('.chart') : null;
+  const image = chartEl ? chartImage(chartEl, { background: '#ffffff' }) : null;
+  toast('Building the slide…');
+  const body = { question: a.question, headline: a.headline, image, table: a.table ? { title: a.table.title, columns: a.table.columns, rows: a.table.rows } : null, lineage: a.lineage || (a.visual && a.visual.lineage) || null, persona: state.persona.id, agents: a.agents, model: a.llm || null };
+  const res = await fetch('api/export/slide', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (!res.ok) { toast('Slide export failed: ' + res.statusText); return; }
+  const blob = await res.blob(); const name = (res.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/);
+  const url = URL.createObjectURL(blob); const link = h('a', { href: url, download: name ? name[1] : 'Astra_slide.pptx' }); document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
+  toast('Slide downloaded');
+}
 
 export const state = { persona: null, meta: null, ref: null, session: 'demo-' + Math.random().toString(36).slice(2, 8), screen: 'home', context: null, quiet: false, lang: 'en', answers: [], lastAnswer: null };
 
@@ -138,7 +151,7 @@ export function answerCard(a, { compact = false } = {}) {
     card.appendChild(toggle); card.appendChild(detail);
   }
   if (a.followUps && a.followUps.length) card.appendChild(h('div', { class: 'chips' }, ...a.followUps.map(q => h('button', { class: 'chip', onClick: () => ask(q) }, q))));
-  card.appendChild(h('div', { class: 'answer-foot' }, a.seeded === false ? seededBadge(false) : seededBadge(true), a.model ? h('span', { class: 'badge accent' }, 'Model: ' + (a.model.name || a.model)) : null, a.llm ? h('span', { class: 'badge real', title: `Planned by: ${a.plannedBy || 'dictionary parser'}` }, a.llm + (a.usage && a.usage.calls ? ` · ${a.usage.calls} call${a.usage.calls > 1 ? 's' : ''}, ${a.usage.input + a.usage.output} tokens` : '')) : null, h('span', { class: 'muted small' }, `${(a.duration_ms / 1000).toFixed(1)} s${a.usage && a.usage.cost ? ' · US$' + a.usage.cost.toFixed(4) : ''}`), h('span', { class: 'spacer' }), a.lineage ? lineageButton(a.lineage, { model: a.model }) : null, h('button', { class: 'btn ghost small', onClick: () => ask('Pin this to my board') }, 'Pin'), h('button', { class: 'btn ghost small', onClick: () => ask('Turn this into a slide') }, 'Slide'), h('button', { class: 'btn ghost small', onClick: () => document.dispatchEvent(new CustomEvent('astra:speak', { detail: a.spoken })) }, '🔈 Speak'), h('button', { class: 'btn ghost small', title: 'Rate this answer', onClick: () => { api('feedback', { body: { value: 1 } }).catch(() => {}); toast('Thanks, recorded in the observatory.'); } }, '👍'), h('button', { class: 'btn ghost small', onClick: () => { api('feedback', { body: { value: -1 } }).catch(() => {}); toast('Thanks, recorded in the observatory.'); } }, '👎')));
+  card.appendChild(h('div', { class: 'answer-foot' }, a.seeded === false ? seededBadge(false) : seededBadge(true), a.model ? h('span', { class: 'badge accent' }, 'Model: ' + (a.model.name || a.model)) : null, a.llm ? h('span', { class: 'badge real', title: `Planned by: ${a.plannedBy || 'dictionary parser'}` }, a.llm + (a.usage && a.usage.calls ? ` · ${a.usage.calls} call${a.usage.calls > 1 ? 's' : ''}, ${a.usage.input + a.usage.output} tokens` : '')) : null, h('span', { class: 'muted small' }, `${(a.duration_ms / 1000).toFixed(1)} s${a.usage && a.usage.cost ? ' · US$' + a.usage.cost.toFixed(4) : ''}`), h('span', { class: 'spacer' }), a.lineage ? lineageButton(a.lineage, { model: a.model }) : null, h('button', { class: 'btn ghost small', onClick: () => ask('Pin this to my board') }, 'Pin'), h('button', { class: 'btn ghost small', title: 'Download this answer as a PowerPoint slide', onClick: () => exportSlide(a, card) }, 'Slide'), h('button', { class: 'btn ghost small', onClick: () => document.dispatchEvent(new CustomEvent('astra:speak', { detail: a.spoken })) }, '🔈 Speak'), h('button', { class: 'btn ghost small', title: 'Rate this answer', onClick: () => { api('feedback', { body: { value: 1 } }).catch(() => {}); toast('Thanks, recorded in the observatory.'); } }, '👍'), h('button', { class: 'btn ghost small', onClick: () => { api('feedback', { body: { value: -1 } }).catch(() => {}); toast('Thanks, recorded in the observatory.'); } }, '👎')));
   return card;
 }
 function shortAction(s) { return s.length > 46 ? s.slice(0, 44) + '…' : s; }

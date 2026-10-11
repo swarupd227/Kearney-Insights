@@ -1,5 +1,5 @@
 // Application shell: persona entry, navigation fallback, command bar, voice orb, answer routing.
-import { state, api, h, toast, ask, answerCard, esc } from './ui.js';
+import { state, api, h, toast, ask, answerCard, esc, exportSlide } from './ui.js';
 import { Voice } from './voice.js';
 import * as home from './screens/home.js';
 import * as canvas from './screens/canvas.js';
@@ -144,7 +144,8 @@ async function handleAsk(question, context) {
     const a = await api('ask', { body: { question, persona: state.persona.id, session: state.session, context: ctx } });
     state.answers.push(a); state.lastAnswer = a;
     canvas.showAnswer(a, pending);
-    if (a.kind === 'act') updateActionCount();
+    if (a.kind === 'act' || a.kind === 'action_centre') updateActionCount();
+    if (a.kind === 'slide') { const prev = [...state.answers].reverse().find(x => x !== a && !['slide', 'board', 'share', 'lineage', 'navigate', 'blocked'].includes(x.kind)); if (prev) { const cards = [...document.querySelectorAll('.answer')]; const card = cards[state.answers.indexOf(prev)] || null; exportSlide(prev, card); } else toast('Ask a question first, then turn it into a slide.'); }
     if (a.kind === 'navigate' && a.screen) { setTimeout(() => go(a.screen), 300); }
     voice.setState('idle');
     if (a.spoken && !state.quiet) voice.speak(a.spoken);

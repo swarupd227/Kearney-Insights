@@ -34,6 +34,11 @@ export function render(el, spec, { onPoint } = {}) {
   const ro = new ResizeObserver(() => chart.resize()); ro.observe(el);
   return chart;
 }
+// PNG of a rendered chart (for the slide export); null if the element has no chart.
+export function chartImage(el, { background } = {}) {
+  const chart = el && instances.get(el); if (!chart) return null;
+  try { return chart.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: background || T.surface, excludeComponents: ['toolbox'] }); } catch (e) { return null; }
+}
 export function buildOption(spec) {
   switch (spec.type) {
     case 'line': return lineOpt(spec);
