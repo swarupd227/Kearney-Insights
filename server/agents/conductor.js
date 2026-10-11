@@ -29,7 +29,7 @@ const cash = require('./cash');
 const observatory = require('./observatory');
 const llm = require('./llm');
 const personas = require('../personas');
-const { fmt, pct, money } = require('./util');
+const { fmt, pct, money, countWord } = require('./util');
 
 const sessions = new Map();
 function memoryFor(sessionId) { if (!sessions.has(sessionId)) sessions.set(sessionId, { history: [] }); return sessions.get(sessionId); }
@@ -180,12 +180,12 @@ async function execute(plan, parsed, persona, memory, tl, context) {
         const alerts = await tl.run('Trend and Anomaly Agent', 'Scanned the headline metrics for new movements outside their expected range', () => trend.feed(persona, { limit: 5 }));
         const acts = await action.list(persona); const pend = acts.filter(a => a.status === 'pending'); const decided = acts.filter(a => a.decided_at && (Date.now() - new Date(a.decided_at)) < 7 * 86400000);
         const eh = await tl.run('Engagement Health Agent', 'Re-scored live engagements', () => engagement.board({ cut: persona.scope.region ? { region: persona.scope.region } : persona.scope.engagements ? { engagement: persona.scope.engagements } : {}, limit: 3 }));
-        const items = [...alerts.map(a => a.text), `${eh.atRisk} live engagements carry an overrun probability above 50%${eh.engagements[0] ? ', led by ' + eh.engagements[0].id : ''}.`, `${pend.length} drafted action${pend.length === 1 ? '' : 's'} waiting for approval${decided.length ? ' and ' + decided.length + ' decided this week' : ''}.`];
-        return { headline: `Since Friday: ${items.join(' ')}`, spoken: `Since Friday: ${items.slice(0, 2).map(s => s.split('(')[0]).join(' ')}`, kind: 'brief', visual: null, table: null, followUps: [alerts[0] ? `Why did ${alerts[0].name.toLowerCase()} move?` : 'Are we on track for the year?', 'Open the action centre', 'Read the brief again, shorter'] };
+        const items = [...alerts.map(a => a.text), `${countWord(eh.atRisk, 'live engagement')} ${eh.atRisk === 1 ? 'carries' : 'carry'} an overrun probability above 50%${eh.engagements[0] ? ', led by ' + eh.engagements[0].id : ''}.`, `${countWord(pend.length, 'drafted action')} ${pend.length === 1 ? 'is' : 'are'} waiting for approval${decided.length ? ' and ' + decided.length + ' decided this week' : ''}.`];
+        return { headline: `Since Friday: ${items.join(' ')}`, spoken: `Since Friday. ${items.slice(0, 2).join(' ')}`, kind: 'brief', visual: null, table: null, followUps: [alerts[0] ? `Why did ${alerts[0].name.toLowerCase()} move?` : 'Are we on track for the year?', 'Open the action centre', 'Read the brief again, shorter'] };
       }
       const r = await tl.run('Briefing Agent', 'Composed the morning brief from the integration points', () => briefing.morningBrief(persona, { shorter: parsed.flags.shorter }));
       if (/tell me more about the first/.test(t)) { parsed.intent = 'explain'; parsed.metrics = ['plan_attainment']; parsed.compare = 'plan'; parsed.cut = scopeDefault(); plan.kind = 'explain'; return execute(plan, parsed, persona, memory, tl, context); }
-      return { headline: r.text, spoken: r.text, kind: 'brief', brief: r, visual: null, table: null, followUps: ['Tell me more about the first point', 'Read the brief again, shorter', 'What has changed since Friday?'] };
+      return { headline: r.text, spoken: r.text, kind: 'brief', brief: r, visual: null, table: null, followUps: ['Tell me more about the first point', parsed.flags.shorter ? 'Read the full brief' : 'Read the brief again, shorter', 'What has changed since Friday?'] };
     }
     case 'client360': {
       const clientId = cut.client || (persona.scope.accounts && persona.scope.accounts[0]) || (last && last.client);

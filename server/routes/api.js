@@ -15,7 +15,7 @@ const guardian = require('../agents/guardian');
 const llm = require('../agents/llm');
 const settingsStore = require('../settings');
 const screens = require('./screens');
-const { fmt } = require('../agents/util');
+const { fmt, dateLabel, num } = require('../agents/util');
 
 const router = express.Router();
 const wrap = fn => (req, res) => fn(req, res).catch(e => { console.error(e); res.status(500).json({ error: e.message }); });
@@ -56,10 +56,10 @@ router.get('/home/:persona', wrap(async (req, res) => {
     let compare = null;
     if (h.compare === 'plan') { const pa = await engine.compute('plan_attainment', { cut: h.cut, period }).catch(() => null); if (pa && pa.rows[0] && pa.rows[0].plan) compare = { label: 'plan', value: pa.rows[0].plan, attainment: pa.rows[0].value }; }
     else if (h.compare === 'ly' && cur) { const ly = await engine.compute(h.metric, { cut: h.cut, period: engine.priorYear(cur.period) }).catch(() => null); if (ly) compare = { label: 'last year', value: ly.total.value }; }
-    else if (!snapshot && cur && cur.period) { const pp = await engine.compute(h.metric, { cut: h.cut, period: engine.priorPeriod(cur.period) }).catch(() => null); if (pp && pp.total.value !== null) compare = { label: 'prior period', value: pp.total.value }; }
+    else if (!snapshot && cur && cur.period) { const pp = await engine.compute(h.metric, { cut: h.cut, period: engine.priorPeriod(cur.period) }).catch(() => null); if (pp && pp.total.value !== null) compare = { label: pp.period && pp.period.label ? pp.period.label.replace('prior twelve months', 'prior 12 months') : 'prior period', value: pp.total.value }; }
     const value = cur ? cur.total.value : null;
     const delta = compare && compare.value !== null && value !== null ? (m.format === 'pct' || m.format === 'ratio' || m.format === 'score' ? value - compare.value : value / compare.value - 1) : null;
-    return { metric: h.metric, name: m.name, format: m.format, value, display: fmt(value, m.format), period: cur ? cur.period.label : '', cut: h.cut, spark, compare, delta, deltaKind: m.format === 'pct' || m.format === 'ratio' || m.format === 'score' ? 'pts' : 'pct', higherIsBetter: m.higherIsBetter, lineage: cur ? cur.lineage : null };
+    return { metric: h.metric, name: m.name, format: m.format, value, display: fmt(value, m.format), period: cur ? (cur.period.label || 'as of today') : '', cut: h.cut, spark, compare, delta, deltaKind: m.format === 'pct' || m.format === 'ratio' || m.format === 'score' ? 'pts' : 'pct', higherIsBetter: m.higherIsBetter, lineage: cur ? cur.lineage : null };
   }));
   const brief = await briefing.morningBrief(persona);
   const feed = await trend.feed(persona, { limit: 5 });
@@ -74,16 +74,16 @@ async function needsYou(persona) {
   if (!scopeCut.client && !scopeCut.engagement && !scopeCut.practice) {
     const pa = await engine.compute('plan_attainment', { cut: scopeCut, period: 'qtd', groupBy: 'unit' });
     const worst = pa.rows.filter(r => r.gap !== null).sort((a, b) => a.gap - b.gap)[0];
-    if (worst && worst.gap < 0) cards.push({ title: `${worst.label} is ${fmt(-worst.gap, 'money')} behind plan`, body: `Plan attainment ${fmt(worst.value, 'pct')} for ${pa.period.label}. The Variance Agent can split the gap into volume and realisation.`, ask: `Why is ${worst.label} behind plan?`, impact: -worst.gap, agent: 'Trend and Anomaly Agent' });
+    if (worst && worst.gap < 0) cards.push({ title: `${worst.label} is ${fmt(-worst.gap, 'money')} behind plan`, body: `Plan attainment ${fmt(worst.value, 'pct')} for ${pa.period.label}. Ask why and the gap is split into volume, rate and realisation.`, ask: `Why is ${worst.label} behind plan?`, impact: -worst.gap, agent: 'Trend and Anomaly Agent' });
   }
   const eh = await engagement.board({ cut: scopeCut.practice ? scopeCut : scopeCut, limit: 3 }).catch(() => null);
-  if (eh && eh.engagements[0] && eh.engagements[0].overrun_prob >= 0.5) cards.push({ title: `${eh.atRisk} engagements likely to overrun`, body: `${eh.engagements[0].id} (${eh.engagements[0].client_name}) leads at ${fmt(eh.engagements[0].overrun_prob, 'pct')}; predicted ${eh.engagements[0].predicted_overrun_date || 'before completion'}.`, ask: 'Which of my engagements will overrun budget, and by when?', impact: eh.atRisk * 1e6, agent: 'Engagement Health Agent' });
+  if (eh && eh.engagements[0] && eh.engagements[0].overrun_prob >= 0.5) cards.push({ title: `${eh.atRisk} engagement${eh.atRisk === 1 ? '' : 's'} likely to overrun`, body: `${eh.engagements[0].id} (${eh.engagements[0].client_name}) leads at ${fmt(eh.engagements[0].overrun_prob, 'pct')}; predicted ${eh.engagements[0].predicted_overrun_date ? dateLabel(eh.engagements[0].predicted_overrun_date) : 'before completion'}.`, ask: 'Which of my engagements will overrun budget, and by when?', impact: eh.atRisk * 1e6, agent: 'Engagement Health Agent' });
   if (persona.id === 'cpo' || persona.id === 'mp') { const talent = require('../agents/talent'); const h = await talent.heatmap({ level: 'PRINCIPAL' }); if (h.ranked[0]) cards.push({ title: `Principal flight risk concentrated in ${h.ranked[0].label}`, body: `About ${h.ranked[0].expected.toFixed(0)} expected exits in six months from ${h.ranked[0].n} Principals; drivers: ${h.drivers.slice(0, 2).map(d => d.driver.toLowerCase()).join(', ')}.`, ask: 'Where will we lose the most Principals in the next six months, and why?', impact: h.ranked[0].expected * 8e5, agent: 'Talent Risk Agent' }); }
-  if (persona.id === 'gal') { cards.push({ title: 'Meeting with LIC leadership tomorrow', body: 'The Client 360 Agent has the account view ready; ask for the brief or the audio version.', ask: 'Prepare me for my meeting with LIC tomorrow', impact: 2.6e6, agent: 'Client 360 Agent' }); }
-  if (persona.id === 'cfo') { const cash = require('../agents/cash'); const li = await cash.lateInvoices({ limit: 1 }); cards.push({ title: `${fmt(li.totals.expected_late, 'money')} of invoices likely to pass 90 days`, body: `${li.totals.n} open invoices; ${fmt(li.totals.overdue, 'money')} already overdue.`, ask: 'Which invoices are most likely to go past 90 days?', impact: li.totals.expected_late, agent: 'Forecast Agent' }); }
+  if (persona.id === 'gal') { cards.push({ title: 'Meeting with LIC leadership tomorrow', body: 'The account view is ready; ask for the brief or the audio version.', ask: 'Prepare me for my meeting with LIC tomorrow', impact: 2.6e6, agent: 'Client 360 Agent' }); }
+  if (persona.id === 'cfo') { const cash = require('../agents/cash'); const li = await cash.lateInvoices({ limit: 1 }); cards.push({ title: `${fmt(li.totals.expected_late, 'money')} of invoices likely to pass 90 days`, body: `${num(li.totals.n)} open invoices; ${fmt(li.totals.overdue, 'money')} already overdue.`, ask: 'Which invoices are most likely to go past 90 days?', impact: li.totals.expected_late, agent: 'Forecast Agent' }); }
   if (persona.id === 'staffing') { const st = require('../agents/staffing'); const mk = await st.marketplace({}); const short = mk.skills.filter(s => s.gap < 0); cards.push({ title: `${mk.roles.filter(r => r.status === 'open').length} open roles in the next eight weeks`, body: short.length ? `Tightest skills: ${short.slice(0, 3).map(s => s.skill).join(', ')}.` : 'Supply covers demand.', ask: 'Who can start on a procurement engagement in Riyadh on Monday?', impact: 1e6, agent: 'Staffing Match Agent' }); }
   if (persona.id === 'gpc_da') { const pl = require('../agents/pipeline'); const r = await pl.room({ cut: { practice: 'DA' } }); cards.push({ title: `${r.stalled.length} Digital and Analytics deals stalled`, body: `${fmt(r.weighted, 'money')} weighted pipeline; ${r.stalled[0] ? r.stalled[0].id + ' is the largest stalled deal' : ''}.`, ask: 'Which large deals have not moved for 30 days?', impact: r.stalled.reduce((a, o) => a + o.value, 0), agent: 'Pipeline and Win Agent' }); }
-  if (persona.id === 'principal') { const sc = require('../agents/staffing'); cards.push({ title: 'Staffing gap on E-1182', body: 'Two Associate roles open for the Implementation workstream; the Staffing Match Agent can propose candidates.', ask: 'Show me Associates with SAP experience rolling off in the next three weeks', impact: 4e5, agent: 'Staffing Match Agent' }); }
+  if (persona.id === 'principal') { const sc = require('../agents/staffing'); cards.push({ title: 'Staffing gap on E-1182', body: 'Two Associate roles open for the Implementation workstream; ask and candidates are proposed.', ask: 'Show me Associates with SAP experience rolling off in the next three weeks', impact: 4e5, agent: 'Staffing Match Agent' }); }
   return cards.sort((a, b) => b.impact - a.impact).slice(0, 3);
 }
 

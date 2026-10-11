@@ -8,7 +8,7 @@ const engine = require('../metrics/engine');
 const ref = require('../metrics/refcache');
 const forecast = require('./forecast');
 const talent = require('./talent');
-const { money, pct, pts, fmt, num } = require('./util');
+const { money, pct, pts, fmt, num, countWord } = require('./util');
 
 async function morningBrief(persona, { shorter = false } = {}) {
   const scopeCut = persona.scope.region ? { region: persona.scope.region } : persona.scope.practice ? { practice: persona.scope.practice } : persona.scope.accounts ? { client: persona.scope.accounts[0] } : persona.scope.engagements ? { engagement: persona.scope.engagements } : {};
@@ -39,18 +39,18 @@ async function morningBrief(persona, { shorter = false } = {}) {
   const nextMonthEnd = engine.addMonths(engine.monthOf(engine.TODAY), 2);
   const overrun = live.filter(e => e.overrun_prob >= 0.5 && e.predicted_overrun_date && e.predicted_overrun_date < nextMonthEnd);
   facts.overrun = overrun.length;
-  parts.push(`${overrun.length} engagement${overrun.length === 1 ? ' is' : 's are'} forecast to overrun next month${overrun[0] ? `, led by ${overrun[0].id}` : ''}.`);
+  parts.push(`${countWord(overrun.length, 'engagement')} ${overrun.length === 1 ? 'is' : 'are'} forecast to overrun next month${overrun[0] ? `, led by ${overrun[0].id}` : ''}.`);
   // 3. Utilisation gap
   if (!scopeCut.client && !scopeCut.engagement) {
     const u = await engine.compute('utilisation', { cut: scopeCut.practice ? scopeCut : scopeCut, period: 'last_month', groupBy: scopeCut.practice ? 'region' : 'unit' });
     const target = 0.68; const rows = u.rows.filter(r => r.value !== null).map(r => ({ ...r, gap: r.value - target })).sort((a, b) => a.gap - b.gap);
-    if (rows[0]) { facts.util = rows[0]; parts.push(`${rows[0].label} is ${pts(rows[0].gap)} against its utilisation target.`); }
+    if (rows[0]) { facts.util = rows[0]; parts.push(`${rows[0].label} is ${Math.abs(rows[0].gap * 100).toFixed(1)} points ${rows[0].gap < 0 ? 'below' : 'above'} its utilisation target.`); }
   }
   // 4. People signal for people leaders
   if (persona.id === 'cpo') { const h = await talent.heatmap({ level: 'PRINCIPAL' }); if (h.ranked[0]) parts.push(`${h.ranked[0].label} shows the highest Principal flight risk, about ${num(h.ranked[0].expected)} expected exits in six months.`); }
   // 5. Drafted actions
-  const pending = await db.one('SELECT COUNT(*)::int AS n FROM actions WHERE status=$1 AND (persona=$2 OR owner=$3)', ['pending', persona.id, persona.title]);
-  parts.push(`I have drafted ${pending.n} action${pending.n === 1 ? '' : 's'} for your review.`);
+  const pending = await db.one('SELECT COUNT(*)::int AS n FROM actions WHERE status=$1', ['pending']);
+  parts.push(pending.n === 0 ? 'No drafted actions are waiting for your review.' : `I have drafted ${countWord(pending.n, 'action', null, { cap: false })} for your review; ${pending.n === 1 ? 'it is' : 'they are'} waiting in the action centre.`);
   const greeting = 'Good morning.';
   const text = shorter ? `${greeting} ${parts[0]} ${parts[parts.length - 1]}` : `${greeting} ${parts.join(' ')}`;
   return { agent: 'Briefing Agent', text, parts, facts, duration_s: Math.round(text.split(' ').length / 2.6), template: '{Region} is {gap to plan} against plan for the quarter, mainly because {largest driver}. {Number} engagements are forecast to overrun next month. {Unit with highest utilisation gap} is {gap} against its utilisation target. I have drafted {number} actions for your review.' };

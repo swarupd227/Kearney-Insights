@@ -13,5 +13,6 @@ export function showThinking(question) {
   const el = h('div', { class: 'answer' }, h('div', { class: 'q' }, h('span', {}, question)), h('div', { class: 'thinking' }, h('span', { class: 'dots' }, h('span'), h('span'), h('span')), h('span', {}, 'Working on it…')));
   list.appendChild(el); el.scrollIntoView({ behavior: 'smooth', block: 'end' }); return el;
 }
-export function showAnswer(a, pending) { const card = answerCard(a); if (pending && pending.isConnected) pending.replaceWith(card); else if (list && list.isConnected) list.appendChild(card); setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80); }
+function updateCount() { const sub = document.querySelector('.screen-head .sub'); if (sub && state.screen === 'canvas') sub.textContent = `${state.persona.title} · ${state.answers.length} answer${state.answers.length === 1 ? '' : 's'} this session`; }
+export function showAnswer(a, pending) { updateCount(); const card = answerCard(a); if (pending && pending.isConnected) pending.replaceWith(card); else if (list && list.isConnected) list.appendChild(card); setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80); }
 export function showError(msg, pending) { const card = h('div', { class: 'answer blocked' }, h('div', { class: 'headline' }, 'Could not answer: ' + msg)); if (pending && pending.isConnected) pending.replaceWith(card); else if (list) list.appendChild(card); }

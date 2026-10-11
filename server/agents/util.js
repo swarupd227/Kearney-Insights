@@ -29,4 +29,6 @@ function tone(delta, higherIsBetter = true) { if (delta === null || isNaN(delta)
 function listWords(items) { if (!items.length) return ''; if (items.length === 1) return items[0]; return items.slice(0, -1).join(', ') + ' and ' + items[items.length - 1]; }
 function monthLabel(s) { const d = new Date(s + 'T00:00:00Z'); return ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getUTCMonth()] + ' ' + d.getUTCFullYear(); }
 function dateLabel(s) { if (!s) return 'n/a'; const d = new Date(s + (s.length === 10 ? 'T00:00:00Z' : '')); return d.getUTCDate() + ' ' + ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][d.getUTCMonth()] + ' ' + d.getUTCFullYear(); }
-module.exports = { money, pct, pts, num, fmt, direction, tone, listWords, monthLabel, dateLabel };
+// Small counts as words at the start of a sentence ("Two engagements", "No actions"); larger counts stay numeric.
+function countWord(n, singular, plural, { cap = true, zero = 'No' } = {}) { const w = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine']; let s = n === 0 ? zero.toLowerCase() : n < 10 ? w[n] : String(n); if (cap) s = s.charAt(0).toUpperCase() + s.slice(1); return s + ' ' + (n === 1 ? singular : (plural || singular + 's')); }
+module.exports = { money, pct, pts, num, fmt, direction, tone, listWords, monthLabel, dateLabel, countWord };

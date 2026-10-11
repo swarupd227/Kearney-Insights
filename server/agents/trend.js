@@ -6,6 +6,7 @@
 const engine = require('../metrics/engine');
 const ref = require('../metrics/refcache');
 const { fmt, monthLabel, pts } = require('./util');
+const catalogue = require('../metrics/catalogue');
 
 function decompose(series) {
   // series: [{month, value}] monthly. Expected = trailing-12 level × month-of-year seasonal index. Residual z via MAD.
@@ -43,8 +44,17 @@ async function feed(persona, { limit = 6 } = {}) {
     if (['pipeline_value', 'weighted_pipeline', 'leverage', 'staffing_fill_rate', 'relationship_breadth', 'lockup_days', 'dso', 'client_satisfaction', 'cross_practice_penetration', 'promotion_velocity', 'regretted_attrition', 'engagement_score', 'sustained_hours', 'budget_burn', 'eac', 'recruiting_conversion', 'time_to_staff', 'learning_hours', 'knowledge_search_success', 'overhead_ratio', 'bench_rate', 'ip_reuse_rate', 'win_rate', 'account_growth'].includes(w.metric)) continue;
     try { const s = await scan(w.metric, w.cut, { months: 20 }); alerts.push(...s.alerts.filter(a => a.month >= engine.addMonths(engine.LAST_CLOSED, -3))); } catch (e) { /* skip */ }
   }
-  alerts.sort((a, b) => Math.abs(b.z) - Math.abs(a.z));
-  return alerts.slice(0, limit);
+  // One item per metric and scope: a run of months above or below range reads as one signal, not three.
+  const groups = new Map();
+  for (const a of alerts) { const key = a.metric + JSON.stringify(a.cut) + a.direction; const g = groups.get(key); if (g) { g.months.push(a.month); if (a.month > g.month) Object.assign(g, { month: a.month, value: a.value, expected: a.expected, severity: Math.abs(a.z) > Math.abs(g.peak) ? a.severity : g.severity }); g.peak = Math.abs(a.z) > Math.abs(g.peak) ? a.z : g.peak; } else groups.set(key, { ...a, months: [a.month], peak: a.z }); }
+  const merged = [...groups.values()].map(g => {
+    g.months.sort(); const n = g.months.length;
+    if (n > 1) { g.span = `${monthLabel(g.months[0]).slice(0, 3)} to ${monthLabel(g.months[n - 1])}`; g.text = `${g.name}${scopeText(g.cut)} has been ${g.direction} its expected range for ${n === 2 ? 'two' : n === 3 ? 'three' : n} months (${g.span}); ${fmt(g.value, catalogue.byId[g.metric].format)} in ${monthLabel(g.month)} against ${fmt(g.expected, catalogue.byId[g.metric].format)} expected.`; }
+    else g.span = monthLabel(g.month);
+    return g;
+  });
+  merged.sort((a, b) => Math.abs(b.peak) - Math.abs(a.peak));
+  return merged.slice(0, limit);
 }
 function scopeText(cut) { const parts = []; for (const d of ['region', 'unit', 'practice', 'client', 'level']) if (cut[d]) parts.push(ref.labelOf(d, cut[d])); return parts.length ? ' in ' + parts.join(', ') : ''; }
 module.exports = { scan, feed, decompose };

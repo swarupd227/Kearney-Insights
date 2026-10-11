@@ -88,7 +88,7 @@ function parseIntent(q, parsed) {
   if (/who can start|who is available|who could start|available (on|from)|rolling off|roll.?off|bench list|open roles|staffing gap|who can i put|candidates for/.test(t)) return 'match';
   if (/lose the most|flight.?risk|highest.?risk|burnout|how many hires|hiring need|hires does|will leave|likely to leave/.test(t)) return 'predict';
   if (/^why\b|\bwhy\b|what (is|was) (driving|behind)|driver|drivers of|cause|caused|bridge|variance|explain (the|this|why)|what changed|contributors|what happened/.test(t)) return 'explain';
-  if (/read the brief|morning brief|tell me more about the first|what has changed since|shorter/.test(t)) return 'brief';
+  if (/read the brief|full brief|morning brief|tell me more about the first|what has changed since|shorter/.test(t)) return 'brief';
   if (/\bforecast\b|\bpredict|\bprojection|\bon track\b|\bwill (we|it|they|this)\b|\blikely\b|probab|\bexpected to\b|next (six|6|three|3) months|year.?end|get worse|overrun|miss plan|at risk|flight.?risk|lose the most|how many hires|hiring need|need next year|go past 90|pay late|close this quarter|most likely to/.test(t)) return 'predict';
   if (/compare|versus|\bvs\b|across (regions|units|practices|levels|offices)|league table|which (units|practices|offices|regions|clients|levels)|rank|top \d+|lowest|highest|fastest|below \d+%|above \d+%|more than \d+ hours|buy (from )?only one/.test(t)) return 'compare';
   if (/show me|what is|what are|how much|how many|give me|list|tell me|open the|go to|take me to/.test(t)) return 'lookup';
