@@ -37,7 +37,7 @@ async function summary({ days = 7 } = {}) {
   const audit = await db.query('SELECT * FROM audit_log ORDER BY ts DESC LIMIT 25');
   const byIntent = await db.query(`SELECT intent, COUNT(*)::int AS runs, AVG(duration_ms) AS avg_ms FROM agent_runs WHERE ts >= $1::timestamptz - make_interval(days => $2) GROUP BY 1 ORDER BY 2 DESC`, [engine.TODAY + 'T23:59:59Z', days]);
   const llmStatus = await require('./llm').status();
-  const narrative = totals.runs ? `Since first boot the agents have handled ${num(totals.runs)} questions at an average of ${(totals.avg_ms / 1000).toFixed(1)} seconds and ${money(totals.avg_cost || 0)} in model cost per answer (${money(totals.cost || 0)} in total; ${llmStatus.configured ? 'language model: ' + llmStatus.label : 'no language model configured, so model cost is zero'}). The Guardian blocked ${totals.blocks} answers and redacted ${totals.redactions}. Users rated ${totals.up} answers up and ${totals.down} down. ${models.length} models are registered; ${models.filter(m => m.uses_llm).length} use a language model through prompts only.` : `No questions have been asked yet. Every run, block and approval will appear here as it happens. ${llmStatus.configured ? 'Language model: ' + llmStatus.label + '.' : 'No language model is configured (Settings).'}`;
+  const narrative = totals.runs ? `Since first boot the agents have handled ${num(totals.runs)} questions at an average of ${(totals.avg_ms / 1000).toFixed(1)} seconds and ${money(totals.avg_cost || 0)} in model cost per answer (${money(totals.cost || 0)} in total; ${llmStatus.configured ? 'language model: ' + llmStatus.label : 'no language model configured, so model cost is zero'}). The Guardian blocked ${totals.blocks === 1 ? 'one answer' : totals.blocks + ' answers'} and redacted ${totals.redactions}. Users rated ${totals.up} answers up and ${totals.down} down. ${models.length} models are registered; ${models.filter(m => m.uses_llm).length} use a language model through prompts only.` : `No questions have been asked yet. Every run, block and approval will appear here as it happens. ${llmStatus.configured ? 'Language model: ' + llmStatus.label + '.' : 'No language model is configured (Settings).'}`;
   return { agent: 'Guardian', registry: REGISTRY, runs, totals, today, byDay, byIntent, models, audit, policy: action.POLICY, narrative, spoken: `${num(totals.runs)} questions in ${days} days, ${(totals.avg_ms / 1000).toFixed(1)} seconds on average, ${totals.blocks} Guardian blocks. Every run, block and approval is in the audit trail.`,
     visual: { type: 'bar', title: 'Runs by agent, last 7 days', subtitle: 'With Guardian blocks', x: runs.map(r => r.agent), series: [{ name: 'Runs', data: runs.map(r => r.runs) }, { name: 'Blocks', data: runs.map(r => r.blocks), kind: 'compare' }], format: 'number', horizontal: true, seeded: true, lineage: { metric: 'agent_runs', name: 'Agent runs', formula: 'Count of runs per agent from the agent log', source_system: 'Astra agent log', stub: 'seeded runs + live runs from this session', tables: ['agent_runs', 'audit_log'], seeded: true } },
     table: composer.table('Agents', 'Runs, response time, cost, blocks, feedback', [['agent', 'Agent'], ['runs', 'Runs'], ['avg_ms', 'Avg ms', 'number'], ['p90_ms', 'P90 ms', 'number'], ['avg_cost', 'Cost per answer', 'money'], ['blocks', 'Blocks'], ['thumbs_up', 'Up'], ['thumbs_down', 'Down']], runs, null),
@@ -48,7 +48,7 @@ async function summary({ days = 7 } = {}) {
 // 11 anomaly detection (alerts raised on the firm revenue series). Other models keep their registry figure and are labelled as such.
 async function liveModelAccuracy(models) {
   const forecast = require('./forecast'); const trend = require('./trend');
-  const out = models.map(m => ({ ...m, accuracy_text: Object.entries(m.accuracy || {}).map(([k, v]) => `${k}: ${v}`).join('; '), accuracy_basis: 'registry' }));
+  const out = models.map(m => ({ ...m, accuracy_text: accuracyText(m.accuracy), accuracy_basis: 'registry' }));
   try {
     const r = await engine.compute('net_fee_revenue', { period: { from: '2024-01-01', to: engine.LAST_CLOSED, label: '' }, groupBy: 'month' });
     const bt = forecast.backtest(r.rows.filter(x => x.value !== null).map(x => ({ month: x.key, value: x.value })));
@@ -59,12 +59,12 @@ async function liveModelAccuracy(models) {
     const pos = opps.filter(o => o.outcome === 'won').map(o => o.win_prob), neg = opps.filter(o => o.outcome !== 'won').map(o => o.win_prob);
     let wins = 0; for (const p of pos) for (const n of neg) wins += p > n ? 1 : p === n ? 0.5 : 0;
     const auc = pos.length && neg.length ? wins / (pos.length * neg.length) : null;
-    const m3 = out.find(m => m.id === 3); if (m3 && auc !== null) { m3.accuracy_text = `AUC ${auc.toFixed(2)} on ${opps.length} decided opportunities (computed now)`; m3.accuracy_basis = 'live'; }
+    const m3 = out.find(m => m.id === 3); if (m3 && auc !== null) { m3.accuracy_text = `AUC ${auc.toFixed(2)} on ${num(opps.length)} decided opportunities (computed now)`; m3.accuracy_basis = 'live'; }
   } catch (e) { /* keep registry */ }
   try {
     const inv = await db.query(`SELECT late_prob, status FROM invoices WHERE status <> 'open'`);
     const tp = inv.filter(i => i.late_prob >= 0.5 && i.status === 'overdue').length, fp = inv.filter(i => i.late_prob >= 0.5 && i.status !== 'overdue').length, fn = inv.filter(i => i.late_prob < 0.5 && i.status === 'overdue').length;
-    const m6 = out.find(m => m.id === 6); if (m6 && (tp + fp) && (tp + fn)) { m6.accuracy_text = `Precision ${(tp / (tp + fp)).toFixed(2)}, recall ${(tp / (tp + fn)).toFixed(2)} on ${inv.length} settled or overdue invoices (computed now)`; m6.accuracy_basis = 'live'; }
+    const m6 = out.find(m => m.id === 6); if (m6 && (tp + fp) && (tp + fn)) { m6.accuracy_text = `Precision ${(tp / (tp + fp)).toFixed(2)}, recall ${(tp / (tp + fn)).toFixed(2)} on ${num(inv.length)} settled or overdue invoices (computed now)`; m6.accuracy_basis = 'live'; }
   } catch (e) { /* keep registry */ }
   try {
     const s = await trend.scan('net_fee_revenue', {}, { months: 30 });
@@ -100,5 +100,15 @@ async function knowledgeSearch(query) {
   const experts = await db.query(`SELECT p.id, p.level, p.office, p.skills FROM people p WHERE p.status='active' AND p.client_service AND p.level IN ('PARTNER','AP','PRINCIPAL') AND EXISTS (SELECT 1 FROM unnest(p.skills) s WHERE lower(s) = ANY($1)) ORDER BY p.level LIMIT 6`, [words]);
   const narrative = hits.length ? `${hits.length} assets match: ${hits.slice(0, 3).map(h => `${h.title} (${h.is_public ? 'public publication' : 'internal asset'}, reused ${h.reuse_count} times)`).join('; ')}.` : 'No registered asset matches that topic.' + (gap ? ` Glean shows ${gap.searches} searches for "${gap.topic}" with only ${pct(gap.opened / gap.searches, 0)} ending in a document opened: a content gap for the knowledge team.` : '') + (experts.length ? ` Experts by identifier: ${experts.map(e => e.id).join(', ')}.` : '');
   return { agent: 'Query Agent', hits: hits.slice(0, 8), gap, experts, narrative: narrative + (gap && hits.length ? ` Glean shows ${gap.searches} searches for "${gap.topic}" with ${pct(gap.opened / gap.searches, 0)} success, so this is a known content gap.` : ''), spoken: hits.length ? `${hits.length} assets match, led by ${hits[0].title}.` : 'Nothing registered matches; this is a content gap.', table: composer.table('Matching assets', 'From Beehive, team sites and Glean', [['title', 'Asset'], ['type', 'Type'], ['practice', 'Practice'], ['reuse_count', 'Reused'], ['downloads', 'Downloads']], hits.slice(0, 8), { metric: 'knowledge', name: 'Knowledge search', source_system: 'Glean, Beehive', stub: 'stub:glean', tables: ['knowledge_assets', 'knowledge_search_topics'], seeded: true }), visual: null, followUps: ['Which topics do consultants search for and fail to find?', 'Show IP reuse rate by practice', 'Who are the experts on this topic?'] };
+}
+// Registry accuracy as a sentence: "Mean absolute error 2.7 points, on closed engagements"; the screen labels the basis.
+function accuracyText(acc) {
+  if (!acc) return ''; if (typeof acc === 'string') return acc;
+  const metric = String(acc.metric || 'accuracy'); const paren = /\(([^)]+)\)/.exec(metric); const name = metric.replace(/\s*\([^)]*\)/, '').trim();
+  const v = acc.value; const isRate = /rate|precision|auc|index|hit|agreement|forecast against|acceptance/i.test(name) && v <= 1;
+  const value = v === undefined ? '' : isRate ? (/auc|index/i.test(name) ? Number(v).toFixed(2) : (v * 100).toFixed(v >= 0.99 ? 1 : 0) + '%') : (/error|variance|mape/i.test(name) && !(paren && /points/i.test(paren[1])) ? Number(v).toFixed(1) + '%' : String(v));
+  const unit = paren && /points/i.test(paren[1]) ? ' points' : ''; const context = paren && !/points/i.test(paren[1]) ? ', ' + paren[1].charAt(0).toLowerCase() + paren[1].slice(1) : '';
+  const extras = []; if (acc.band_coverage !== undefined) extras.push(`band coverage ${(acc.band_coverage * 100).toFixed(0)}%`); if (acc.calibration_error !== undefined) extras.push(`calibration error ${acc.calibration_error}`); if (acc.fairness) extras.push(`fairness ${String(acc.fairness).toLowerCase()}`);
+  return `${name} ${value}${unit}${context}${extras.length ? '; ' + extras.join(', ') : ''}`;
 }
 module.exports = { summary, policy, tickets, adoption, knowledgeSearch, REGISTRY };
