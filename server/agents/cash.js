@@ -1,6 +1,6 @@
 'use strict';
 /**
- * Cash and billing helpers used by the Forecast Agent (model 6, late payment) and the cash and billing desk screen.
+ * Cash and billing helpers used by the forecast (model 6, late payment) and the cash and billing desk screen.
  */
 const db = require('../db');
 const engine = require('../metrics/engine');

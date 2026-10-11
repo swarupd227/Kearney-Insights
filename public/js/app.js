@@ -71,7 +71,7 @@ function closePersonaModal() { if (!localStorage.getItem('astra.persona')) local
 function selectPersona(p) {
   state.persona = p; localStorage.setItem('astra.persona', p.id); renderPersonaChip(); markPrimaryLinks(); state.answers = []; state.session = 'demo-' + Math.random().toString(36).slice(2, 8);
   document.querySelectorAll('.persona-card').forEach(c => c.classList.toggle('active', c.querySelector('.t').textContent === p.title));
-  closePersonaModal(); toast(`Guardian loaded the ${p.short} scope`); voice.stopSpeaking();
+  closePersonaModal(); toast(`Switched to ${p.short}`); voice.stopSpeaking();
   if (location.hash === '#/home' || !location.hash) show('home', {}); else go('home');
 }
 
@@ -120,7 +120,7 @@ function applyTheme(theme) {
   const b = document.getElementById('themeBtn'); if (b) b.textContent = theme === 'light' ? '☾ Dark' : '☀ Light';
   document.getElementById('themeBtn').onclick = () => { applyTheme(theme === 'light' ? 'dark' : 'light'); show(state.screen, {}); };
 }
-function renderLlmChip(l) { const c = document.getElementById('llmChip'); if (!c) return; const err = l && l.lastError; c.textContent = l && l.configured ? (err ? `LLM: ${l.label} ⚠` : `LLM: ${l.label}`) : 'LLM: off'; c.title = l && l.configured ? (err ? `Last call failed: ${err.message}. Open Settings.` : `Language model from ${l.source}: ${l.label}. Open Settings to change.`) : 'No language model configured. Open Settings to connect one.'; c.onclick = () => go('settings'); c.style.borderColor = l && l.configured ? (err ? 'var(--bad)' : 'var(--good)') : ''; }
+function renderLlmChip(l) { const c = document.getElementById('llmChip'); if (!c) return; c.style.display = 'none'; const err = l && l.lastError; c.textContent = l && l.configured ? (err ? `LLM: ${l.label} ⚠` : `LLM: ${l.label}`) : 'LLM: off'; c.title = l && l.configured ? (err ? `Last call failed: ${err.message}. Open Settings.` : `Language model from ${l.source}: ${l.label}. Open Settings to change.`) : 'No language model configured. Open Settings to connect one.'; c.onclick = () => go('settings'); c.style.borderColor = l && l.configured ? (err ? 'var(--bad)' : 'var(--good)') : ''; }
 function setupVoice() {
   const orb = document.getElementById('orb'); const st = document.getElementById('orbState'); const tr = document.getElementById('transcript');
   voice = new Voice({

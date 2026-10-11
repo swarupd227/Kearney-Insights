@@ -19,10 +19,10 @@ const STORYLINES = [
   { id: 'D', title: 'The Chief People Officer finds where talent is at risk', minutes: 3, persona: 'cpo', steps: [
     { say: 'Where will we lose the most Principals in the next six months, and why?', does: 'Flight-risk heatmap by unit and level with the top drivers', point: 'Predictive people analytics with reasons' },
     { say: 'Show me the highest-risk Principals', does: 'Lists them by identifier with drivers, because this role is authorised', point: 'Detail is available to those entitled to it' },
-    { say: 'Show me the flight risk of my colleagues', persona: 'principal', does: 'The Guardian blocks the request, explains why, and records the block', point: 'Trust is built into the product' },
+    { say: 'Show me the flight risk of my colleagues', persona: 'principal', does: 'The request is blocked, the reason explained, and the block recorded', point: 'Trust is built into the product' },
     { say: 'How many hires does India need next year?', persona: 'cpo', does: 'Hiring need forecast by level, linked to the skill demand forecast', point: 'Planning, not only reporting' }] },
   { id: 'E', title: 'The KNet leader sees that the agents are governed', minutes: 2, persona: 'knet', steps: [
-    { say: 'Show me what the agents did today', does: 'Observatory: runs, response times, cost per answer, model accuracy, Guardian blocks', point: 'Agents are visible and accountable' },
+    { say: 'Show me what the agents did today', does: 'Observatory: runs, response times, cost per answer, model accuracy, blocked requests', point: 'Agents are visible and accountable' },
     { say: 'What can the Action Agent change?', does: 'Draft-only rights, named approvers, permitted connectors', point: 'The same autonomy model as the managed-services proposal' },
     { say: 'Show me our service desk volumes by application', does: 'Ticket volumes through the ServiceNow path', point: 'IT service data flows through the same product' },
     { say: 'How was this calculated?', does: 'Lineage from the source through the lakehouse to the visual', point: 'This runs on the data estate we will manage under B4' }] }
