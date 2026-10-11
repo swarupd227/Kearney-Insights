@@ -84,7 +84,7 @@ function parseIntent(q, parsed) {
   if (/find me|material on|kearney material|documents? on|search for|knowledge on|who knows about|experts? on|look for/.test(t)) return 'knowledge';
   if (/prepare me|prepare for|brief me|meeting (with|tomorrow)|account (360|plan|brief)|audio brief|for the car|what have we done for|who in the firm (has worked|knows)|relationship map|white space|whitespace|where is the white/.test(t)) return 'client360';
   if (/who can start|who is available|who could start|available (on|from)|rolling off|roll.?off|bench list|open roles|staffing gap|who can i put|candidates for/.test(t)) return 'match';
-  if (/lose the most|flight.?risk|highest.?risk|attrition|burnout|how many hires|hiring need|hires does/.test(t)) return 'predict';
+  if (/lose the most|flight.?risk|highest.?risk|burnout|how many hires|hiring need|hires does|will leave|likely to leave/.test(t)) return 'predict';
   if (/^why\b|\bwhy\b|what (is|was) (driving|behind)|driver|drivers of|cause|caused|bridge|variance|explain (the|this|why)|what changed|contributors|what happened/.test(t)) return 'explain';
   if (/read the brief|morning brief|tell me more about the first|what has changed since|shorter/.test(t)) return 'brief';
   if (/\bforecast\b|\bpredict|\bprojection|\bon track\b|\bwill (we|it|they|this)\b|\blikely\b|probab|\bexpected to\b|next (six|6|three|3) months|year.?end|get worse|overrun|miss plan|at risk|flight.?risk|lose the most|how many hires|hiring need|need next year|go past 90|pay late|close this quarter|most likely to/.test(t)) return 'predict';

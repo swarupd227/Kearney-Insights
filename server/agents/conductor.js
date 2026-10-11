@@ -220,7 +220,7 @@ async function execute(plan, parsed, persona, memory, tl, context) {
   }
   return lookup(plan, parsed, persona, memory, tl, context);
 }
-function scopeCutFor(cut, persona) { const c = { ...cut }; if (!Object.keys(c).length) { if (persona.scope.region) c.region = persona.scope.region; if (persona.scope.practice) c.practice = persona.scope.practice; if (persona.scope.accounts) c.client = persona.scope.accounts[0]; } return c; }
+function scopeCutFor(cut, persona, metricId) { const c = { ...cut }; const peopleMetric = metricId && catalogue.byId[metricId] && catalogue.byId[metricId].family === 'C'; if (!Object.keys(c).length) { if (persona.scope.region) c.region = persona.scope.region; if (persona.scope.practice && !peopleMetric) c.practice = persona.scope.practice; if (persona.scope.accounts && !peopleMetric) c.client = persona.scope.accounts[0]; } if (peopleMetric) delete c.client; return c; }
 
 async function risks(persona, tl) {
   const alerts = await tl.run('Trend and Anomaly Agent', 'Scanned the headline metrics for movements outside their expected range', () => trend.feed(persona, { limit: 4 }));
@@ -261,7 +261,7 @@ async function lookup(plan, parsed, persona, memory, tl, context) {
   if (['client_concentration', 'fee_model_mix', 'wip_ageing', 'knowledge_search_success', 'research_reach'].includes(metricId)) groupBy = null;
   if (groupBy && ['partner'].includes(groupBy) && m.sensitive) plan.sensitive = m.sensitive;
   const period = parsed.period || (['pipeline_value', 'weighted_pipeline', 'lockup_days', 'dso', 'leverage', 'staffing_fill_rate', 'relationship_breadth', 'client_satisfaction', 'engagement_score'].includes(metricId) ? 'now' : ['month', 'quarter', 'year'].includes(groupBy) ? (groupBy === 'year' ? 'last_3y' : 'ltm') : 'ltm');
-  const scopeCut = Object.keys(cut).length ? cut : (parsed.followUp && memory.last ? memory.last.cut : scopeCutFor(cut, persona));
+  const scopeCut = scopeCutFor(Object.keys(cut).length ? cut : (parsed.followUp && memory.last ? memory.last.cut : {}), persona, metricId);
   if (plan.aggregateOnly && groupBy && ['unit', 'office', 'engagement', 'client'].includes(groupBy)) groupBy = 'region';
   await tl.run('Metric Agent', `Resolved "${m.name}" (${m.formula})`, async () => null);
   const result = await tl.run('Query Agent', `Read ${m.source} data under row-level security${groupBy ? ', grouped by ' + groupBy : ''}`, () => engine.compute(metricId, { cut: scopeCut, period, groupBy }));
