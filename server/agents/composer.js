@@ -15,6 +15,9 @@ function fromMetric(result, opts = {}) {
   if (result.bands) {
     return { type: 'bar', title, subtitle, x: rows.map(r => r.key), series: [{ name: m.name, data: rows.map(r => r.value) }], format: m.format, seeded, lineage: result.lineage };
   }
+  if ((g === 'month' || g === 'quarter' || g === 'year') && rows.length && !/^\d{4}-\d{2}-\d{2}$/.test(String(rows[0].key))) {
+    return { type: 'kpi', title: m.name + scopeLabel(result.cut), subtitle: (result.period ? result.period.label : '') + ' · no time series is available for this metric', value: result.total.value, format: m.format, seeded, lineage: result.lineage };
+  }
   if (g === 'month' || g === 'quarter' || g === 'year') {
     const x = rows.map(r => g === 'month' ? monthLabel(r.key) : g === 'quarter' ? qLabel(r.key) : r.key.slice(0, 4));
     const series = [{ name: m.name, data: rows.map(r => r.value) }];

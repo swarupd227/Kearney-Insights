@@ -65,7 +65,8 @@ async function ask({ question, personaId, sessionId = 'default', context = {} })
     const lp = await tl.run('Conductor', `Planned the question with ${st.label}`, () => llm.planFallback(question, { metricIds: catalogue.metrics.map(m => m.id), dims, persona, hint }));
     if (lp && typeof lp === 'object') {
       const INTENTS = ['lookup', 'compare', 'explain', 'predict', 'simulate', 'act', 'brief', 'match', 'client360', 'knowledge', 'observatory', 'it_service', 'chat'];
-      if (INTENTS.includes(lp.intent)) parsed.intent = lp.intent;
+      const STICKY = ['client360', 'match', 'act', 'simulate', 'observatory', 'it_service', 'knowledge', 'brief'];
+      if (INTENTS.includes(lp.intent) && !(STICKY.includes(parsed.intent) && lp.intent !== 'chat')) parsed.intent = lp.intent;
       if (Array.isArray(lp.metrics)) parsed.metrics = lp.metrics.filter(m => catalogue.byId[m]);
       if (lp.cut && typeof lp.cut === 'object') for (const [k, v] of Object.entries(lp.cut)) if (dims[k] && dims[k].includes(v)) parsed.cut[k] = v;
       if (['month', 'quarter', 'year', 'region', 'unit', 'office', 'practice', 'industry', 'level', 'client', 'engagement'].includes(lp.groupBy)) parsed.groupBy = lp.groupBy;

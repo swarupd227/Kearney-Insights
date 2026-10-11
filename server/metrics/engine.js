@@ -192,6 +192,15 @@ const IMPL = {
   staffing_fill_rate: async (c, p, g) => { const P = new Params(); const rows = await db.query(`SELECT ${g === 'unit' ? 's.unit' : g === 'level' ? 's.level' : "'all'"} AS key, COUNT(*)::int AS requested, SUM(CASE WHEN status='filled' THEN 1 ELSE 0 END)::int AS filled, AVG(CASE WHEN filled_date IS NOT NULL THEN filled_date - requested_date END) AS days FROM staffing_roles s WHERE 1=1 ${cutWhere(c, { unit: 's.unit', level: 's.level', engagement: 's.engagement_id' }, P)} GROUP BY 1`, P.values); return { rows: rows.map(r => ({ key: fmtKey(r.key), value: div(r.filled, r.requested), filled: r.filled, requested: r.requested, days: r.days })), tables: ['staffing_roles'] }; },
   time_to_staff: async (c, p, g) => { const r = await IMPL.staffing_fill_rate(c, p, g); return { rows: r.rows.map(x => ({ key: x.key, value: x.days, filled: x.filled })), tables: ['staffing_roles'] }; },
   regretted_attrition: async (c, p, g) => {
+    if (timeDim(g)) {
+      const rows = []; const months = []; for (let m = p.from; m <= p.to; m = addMonths(m, 1)) months.push(m);
+      for (const m of months) {
+        const P = new Params(); const start = addMonths(m, -11); const end = addMonths(m, 1);
+        const r = await db.one(`SELECT SUM(CASE WHEN p.status='left' AND p.regretted AND p.left_date >= ${P.add(start)} AND p.left_date < ${P.add(end)} THEN 1 ELSE 0 END)::int AS regretted, SUM(CASE WHEN p.hire_date < $2 AND (p.left_date IS NULL OR p.left_date >= $2) THEN 1 ELSE 0 END)::int AS headcount FROM people p WHERE p.client_service AND p.type='employee' ${cutWhere(c, PPL_DIMS, P)}`, P.values);
+        rows.push({ key: m, value: div(r.regretted, r.headcount), regretted: r.regretted, headcount: r.headcount });
+      }
+      return { rows, tables: ['people'], note: 'Trailing twelve months at each month end' };
+    }
     const P = new Params(); const from = addMonths(LAST_CLOSED, -11);
     const rows = await db.query(`SELECT ${groupExpr(g, 'p') && !timeDim(g) ? groupExpr(g, 'p') : "'all'"} AS key, SUM(CASE WHEN p.status='left' AND p.regretted AND p.left_date >= ${P.add(from)} THEN 1 ELSE 0 END)::int AS regretted, SUM(CASE WHEN p.status='left' AND p.left_date >= $1 THEN 1 ELSE 0 END)::int AS leavers, SUM(CASE WHEN p.status='active' THEN 1 ELSE 0 END)::int AS headcount FROM people p WHERE p.client_service AND p.type='employee' ${cutWhere(c, PPL_DIMS, P)} GROUP BY 1 ORDER BY 1`, P.values);
     return { rows: rows.map(r => ({ key: fmtKey(r.key), value: div(r.regretted, r.headcount), regretted: r.regretted, leavers: r.leavers, headcount: r.headcount })), tables: ['people'], note: 'Last twelve months, annualised against active headcount' };
