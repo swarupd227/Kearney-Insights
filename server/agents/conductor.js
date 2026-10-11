@@ -65,7 +65,7 @@ async function ask({ question, personaId, sessionId = 'default', context = {} })
     const lp = await tl.run('Conductor', `Planned the question with ${st.label}`, () => llm.planFallback(question, { metricIds: catalogue.metrics.map(m => m.id), dims, persona, hint }));
     if (lp && typeof lp === 'object') {
       const INTENTS = ['lookup', 'compare', 'explain', 'predict', 'simulate', 'act', 'brief', 'match', 'client360', 'knowledge', 'observatory', 'it_service', 'chat'];
-      const STICKY = ['client360', 'match', 'act', 'simulate', 'observatory', 'it_service', 'knowledge', 'brief'];
+      const STICKY = ['client360', 'match', 'act', 'action_centre', 'simulate', 'observatory', 'it_service', 'knowledge', 'brief', 'lineage', 'board'];
       if (INTENTS.includes(lp.intent) && !(STICKY.includes(parsed.intent) && lp.intent !== 'chat')) parsed.intent = lp.intent;
       if (Array.isArray(lp.metrics)) parsed.metrics = lp.metrics.filter(m => catalogue.byId[m]);
       if (lp.cut && typeof lp.cut === 'object') for (const [k, v] of Object.entries(lp.cut)) if (dims[k] && dims[k].includes(v)) parsed.cut[k] = v;
@@ -229,7 +229,7 @@ async function execute(plan, parsed, persona, memory, tl, context) {
     }
     case 'predict': {
       if (/will it get worse|get worse|will (they|these|those) overrun/.test(t) && last && (last.contributors || last.engagements)) { const ids = (last.contributors || last.engagements).map(c => c.engagement || c.id).filter(Boolean); const r = await tl.run('Engagement Health Agent', 'Forecast overrun and realisation at completion for the named engagements', () => engagement.willItGetWorse({ engagements: ids })); return { ...r, headline: r.narrative, screen: 'engagements', kind: 'engagement_health' }; }
-      if (/hires?|hiring need|recruit/.test(t)) { const r = await tl.run('Talent Risk Agent', 'Ran the hiring need forecast linked to skill demand', () => talent.hiringNeed({ cut: scopeCutFor(cut, persona), year: 2027 })); return { ...r, headline: r.narrative, screen: 'talent', kind: 'talent' }; }
+      if (/\bhires?\b|hiring need|hiring forecast|recruit/.test(t)) { const r = await tl.run('Talent Risk Agent', 'Ran the hiring need forecast linked to skill demand', () => talent.hiringNeed({ cut: scopeCutFor(cut, persona), year: 2027 })); return { ...r, headline: r.narrative, screen: 'talent', kind: 'talent' }; }
       if (/flight|attrition|lose the most|leave|retention risk|regretted|highest.?risk/.test(t) || parsed.metrics.includes('regretted_attrition')) {
         if (parsed.flags.individual_people) { const r = await tl.run('Talent Risk Agent', 'Listed individual flight-risk scores with drivers (authorised view, logged)', () => talent.individuals({ cut: scopeCutFor(cut, persona), level: cut.level || 'PRINCIPAL' })); await guardian.log(persona.id, 'people_individual_view', { question: parsed.question, level: cut.level || 'PRINCIPAL' }); return { ...r, headline: r.narrative, screen: 'talent', kind: 'talent' }; }
         const r = await tl.run('Talent Risk Agent', 'Scored flight risk by unit and level and aggregated the drivers', () => talent.heatmap({ cut: scopeCutFor(cut, persona), level: cut.level || null, individuals: persona.policy.individual_people === true })); tl.note('Forecast Agent', 'Converted scores to expected exits over six months'); return { ...r, headline: r.narrative, screen: 'talent', kind: 'talent' };
