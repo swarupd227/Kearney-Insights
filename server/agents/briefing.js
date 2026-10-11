@@ -69,11 +69,11 @@ function metricNarrative(result, { compare = null, compareValue = null, compareL
       return { text, spoken: text + (m.higherIsBetter === (delta >= 0) ? '' : ' Ask me why.') };
     }
     const sorted = [...rows].sort((a, b) => b.value - a.value); const best = sorted[0], worst = sorted[sorted.length - 1];
-    const text = `${m.name}${where} ranges from ${fmt(worst.value, m.format)} (${worst.label}) to ${fmt(best.value, m.format)} (${best.label}) for ${result.period.label}${result.total && result.total.value !== null ? `; overall ${fmt(result.total.value, m.format)}` : ''}.`;
+    const text = `${m.name}${where} ranges from ${fmt(worst.value, m.format)} (${worst.label}) to ${fmt(best.value, m.format)} (${best.label})${result.period.label ? ' for ' + result.period.label : ''}${result.total && result.total.value !== null ? `; overall ${fmt(result.total.value, m.format)}` : ''}.`;
     return { text, spoken: `${m.name}${where}: ${best.label} is highest at ${fmt(best.value, m.format)} and ${worst.label} lowest at ${fmt(worst.value, m.format)}. Ask me why ${m.higherIsBetter ? worst.label : best.label} stands out.` };
   }
   const v = result.total.value;
-  let text = `${m.name}${where} is ${fmt(v, m.format)} for ${result.period.label}`;
+  let text = `${m.name}${where} is ${fmt(v, m.format)}${result.period.label ? ' for ' + result.period.label : ''}`;
   if (compareValue !== null && compareValue !== undefined) { const d = v - compareValue; text += `, ${m.format === 'pct' ? pts(d) : (d >= 0 ? 'up ' : 'down ') + fmt(Math.abs(d), m.format)} against ${compareLabel} (${fmt(compareValue, m.format)})`; }
   text += '.';
   return { text, spoken: text + ` Ask me to explain it or forecast it.` };

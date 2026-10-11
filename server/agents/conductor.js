@@ -328,7 +328,14 @@ async function lookup(plan, parsed, persona, memory, tl, context) {
     tl.note('Query Agent', `Filtered to members ${below ? 'below' : 'above'} ${pct(lim, 0)}`);
   }
   const narr = narrOverride ? { text: narrOverride, spoken: narrOverride + (result.rows[0] ? ` Ask me why ${result.rows[0].label} stands out.` : '') } : briefing.metricNarrative(result, { compareValue, compareLabel });
-  const visual = await tl.run('Dashboard Composer Agent', `Chose a ${groupBy ? (['month', 'quarter', 'year'].includes(groupBy) ? 'trend line' : 'ranked bar chart') : 'headline tile'} from the visual grammar`, async () => composer.fromMetric(result, { ...opts, map: groupBy === 'region' && /map/.test(t) }));
+  // a single headline value is shown with its twelve-month trend when the metric has one
+  const SNAPSHOT = ['pipeline_value', 'weighted_pipeline', 'lockup_days', 'dso', 'leverage', 'staffing_fill_rate', 'time_to_staff', 'relationship_breadth', 'client_satisfaction', 'engagement_score', 'promotion_velocity', 'sustained_hours', 'learning_hours', 'recruiting_conversion', 'cross_practice_penetration', 'budget_burn', 'eac', 'fx_impact', 'ip_reuse_rate', 'win_rate', 'client_concentration', 'fee_model_mix', 'wip_ageing', 'knowledge_search_success', 'research_reach', 'counselling_load', 'expert_network_use', 'scope_change_rate', 'new_clients', 'book_to_bill', 'proposal_cycle_time', 'regretted_attrition'].includes(metricId);
+  let trend = null;
+  if (!groupBy && !SNAPSHOT && result.rows.length === 1) { try { trend = await tl.run('Query Agent', 'Read the twelve-month history for the trend', () => engine.compute(metricId, { cut: scopeCut, period: 'ltm', groupBy: 'month' })); if (!trend.rows.length || trend.rows.length < 3) trend = null; } catch (e) { trend = null; } }
+  const visual = await tl.run('Dashboard Composer Agent', `Chose a ${groupBy || trend ? (['month', 'quarter', 'year'].includes(groupBy) || trend ? 'trend line' : 'ranked bar chart') : 'headline tile'} from the visual grammar`, async () => {
+    if (trend) { const v = composer.fromMetric(trend, { ...opts, target: opts.target, title: `${m.name}${composer.scopeLabel(scopeCut)}`, subtitle: `${result.period.label}: ${fmt(result.total.value, m.format)} · monthly trend` }); return v; }
+    return composer.fromMetric(result, { ...opts, map: groupBy === 'region' && /map/.test(t), delta: compareValue !== null && compareValue !== undefined && result.total.value !== null ? (m.format === 'pct' ? result.total.value - compareValue : result.total.value - compareValue) : null, deltaLabel: compareLabel ? 'vs ' + compareLabel : null });
+  });
   tl.note('Briefing Agent', 'Wrote the headline and the spoken answer');
   const extra = result.extra || null;
   const followUps = [`Why did ${m.name.toLowerCase()} change?`, `Forecast ${m.name.toLowerCase()} to year end`, groupBy ? `Show ${m.name.toLowerCase()} by month` : `Show ${m.name.toLowerCase()} by ${scopeCut.region ? 'unit' : 'region'}`];

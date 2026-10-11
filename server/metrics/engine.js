@@ -28,7 +28,7 @@ function periodFor(key) {
     case 'last_6m': case 'last_six_months': return { from: addMonths(last, -5), to: last, label: 'last six months' };
     case 'last_3y': return { from: addMonths(last, -35), to: last, label: 'last three years' };
     case 'all': return { from: '2024-01-01', to: last, label: 'since January 2024' };
-    case 'now': case 'open': case 'ltd': return { from: '2024-01-01', to: last, label: 'current' };
+    case 'now': case 'open': case 'ltd': return { from: '2024-01-01', to: last, label: '' };
     default: return { from: addMonths(last, -11), to: last, label: 'last twelve months' };
   }
 }
@@ -53,7 +53,7 @@ function cutWhere(cut, dims, P) {
 }
 function groupExpr(groupBy, table) {
   if (!groupBy) return null;
-  const time = { month: 'MONTHCOL', quarter: "date_trunc('quarter', MONTHCOL)::date", year: "date_trunc('year', MONTHCOL)::date" };
+  const time = { month: "date_trunc('month', MONTHCOL)::date", quarter: "date_trunc('quarter', MONTHCOL)::date", year: "date_trunc('year', MONTHCOL)::date" };
   if (time[groupBy]) return time[groupBy].replace(/MONTHCOL/g, table === 'em' ? 'em.month' : table === 'pm' ? 'pm.month' : table === 'inv' ? 'i.issue_date' : 'o.created_date');
   const dims = table === 'pm' || table === 'p' ? PPL_DIMS : table === 'inv' ? { region: 'i.region', unit: 'i.unit', client: 'i.client_id', engagement: 'i.engagement_id' } : table === 'opp' ? { region: 'o.region', unit: 'o.unit', practice: 'o.practice', industry: 'o.industry', client: 'o.client_id', partner: 'o.partner_id', stage: 'o.stage', fee_model: 'o.fee_model' } : ENG_DIMS;
   return dims[groupBy] || null;

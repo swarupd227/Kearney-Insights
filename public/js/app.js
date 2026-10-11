@@ -80,8 +80,10 @@ function setupRail() {
   document.querySelectorAll('.rail-link').forEach(a => a.addEventListener('click', () => go(a.dataset.screen)));
   document.getElementById('brand').addEventListener('click', () => go('home'));
   const rail = document.getElementById('rail'); const more = document.getElementById('railMore');
-  const apply = () => { const collapsed = localStorage.getItem('astra.rail') !== 'expanded'; rail.classList.toggle('collapsed', collapsed); more.textContent = collapsed ? 'More ▾' : 'Fewer ▴'; };
-  more.addEventListener('click', () => { localStorage.setItem('astra.rail', rail.classList.contains('collapsed') ? 'expanded' : 'collapsed'); apply(); });
+  // The rail always starts collapsed; expanding it lasts only until the next page load.
+  let collapsed = true;
+  const apply = () => { rail.classList.toggle('collapsed', collapsed); more.textContent = collapsed ? 'More ▾' : 'Fewer ▴'; };
+  more.addEventListener('click', () => { collapsed = !collapsed; apply(); });
   markPrimaryLinks(); apply();
 }
 // Collapsed rail shows four items: Home, the canvas, the persona's own workspace and the action centre (plus the current screen).

@@ -88,6 +88,13 @@ export function renderVisual(spec, { onPoint, compact = false, titleOverride } =
   if (!spec) return null;
   if (spec.type === 'table') return renderTable(spec);
   if (spec.type === 'scenario') return scenarioTable(spec);
+  if (spec.type === 'kpi') {
+    const good = spec.delta == null ? null : spec.delta >= 0;
+    return h('div', { class: 'card' }, h('h3', {}, titleOverride || spec.title || ''), spec.subtitle ? h('div', { class: 'sub' }, spec.subtitle) : null,
+      h('div', { class: 'value', style: { fontSize: '40px', fontWeight: 600, letterSpacing: '-.02em', margin: '6px 0 2px' } }, spec.value == null ? '–' : fmtValue(spec.value, spec.format)),
+      spec.delta != null ? h('div', { class: 'small ' + (good ? 'good' : 'bad') }, (spec.format === 'pct' ? FMT.pts(spec.delta) : (spec.delta >= 0 ? '+' : '') + fmtValue(spec.delta, spec.format)) + (spec.deltaLabel ? ' ' + spec.deltaLabel : '')) : null,
+      h('div', { class: 'card-foot' }, spec.badge ? seededBadge(false, spec.badge) : seededBadge(spec.seeded !== false), spec.lineage ? lineageButton(spec.lineage) : null));
+  }
   const card = h('div', { class: 'card' + (compact ? ' flat' : '') });
   card.appendChild(h('h3', {}, titleOverride || spec.title || ''));
   if (spec.subtitle) card.appendChild(h('div', { class: 'sub' }, spec.subtitle));
