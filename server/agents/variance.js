@@ -174,7 +174,8 @@ async function margin(cut, pA, pB) {
   return { agent: 'Variance Agent', metric: 'contribution_margin', drivers: [{ driver: 'Staff cost ratio', effect: cost }, { driver: 'Unrecovered expenses', effect: unrec }], narrative, spoken: narrative, visual: composer.waterfall('Margin bridge', `${pA.label} to ${pB.label}`, steps, 'pct', lineageFor('contribution_margin', cut, pB, ['engagement_months'])), followUps: ['Show margin by unit', 'Which engagements have the lowest margin?', 'Forecast margin to year end'] };
 }
 async function generic(metricId, cut, pA, pB) {
-  const g = cut.unit ? 'practice' : cut.region ? 'unit' : 'region';
+  // Break the change down by the first dimension the question has not already fixed.
+  const g = !cut.region && !cut.unit && !cut.office ? 'region' : !cut.unit && !cut.office ? 'unit' : !cut.practice ? 'practice' : !cut.client ? 'client' : 'level';
   const [a, b, ta, tb] = await Promise.all([engine.compute(metricId, { cut, period: pA, groupBy: g }), engine.compute(metricId, { cut, period: pB, groupBy: g }), engine.compute(metricId, { cut, period: pA }), engine.compute(metricId, { cut, period: pB })]);
   const am = Object.fromEntries(a.rows.map(r => [r.key, r.value]));
   const m = a.metric; const additive = m.format === 'money' && !['revenue_per_partner', 'revenue_per_professional', 'profit_per_partner', 'effective_rate', 'eac'].includes(m.id);
@@ -184,7 +185,7 @@ async function generic(metricId, cut, pA, pB) {
   if (additive) { for (const c of contributors) steps.push({ label: c.label, value: c.change || 0, kind: 'delta' }); }
   steps.push({ label: pB.label, value: total.after, kind: 'end' });
   const { fmt } = require('./util');
-  const narrative = `${m.name}${composer.scopeIn(cut)} moved from ${fmt(total.before, m.format)} in ${pA.label} to ${fmt(total.after, m.format)} in ${pB.label}. ${contributors.length ? `The largest fall was in ${contributors[0].label} and the largest rise in ${contributors[contributors.length - 1].label}.` : ''}`;
+  const narrative = `${m.name}${composer.scopeIn(cut)} moved from ${fmt(total.before, m.format)} in ${pA.label} to ${fmt(total.after, m.format)} in ${pB.label}. ${contributors.length === 1 ? `All of it sits in ${contributors[0].label}.` : contributors.length ? `The largest fall was in ${contributors[0].label}${contributors[contributors.length - 1].change > 0 ? ` and the largest rise in ${contributors[contributors.length - 1].label}` : `; ${contributors[contributors.length - 1].label} held up best`}.` : ''}`;
   return { agent: 'Variance Agent', metric: metricId, contributors, narrative, spoken: narrative, visual: additive ? composer.waterfall(`${m.name} bridge`, `${pA.label} to ${pB.label}`, steps, m.format, tb.lineage) : composer.fromMetric(b, { compareMap: am, compareName: pA.label }), followUps: [`Forecast ${m.name.toLowerCase()} to year end`, `Show ${m.name.toLowerCase()} by month`, 'What should I do about it?'] };
 }
 function empty(metricId, cut, p) { return { agent: 'Variance Agent', metric: metricId, narrative: 'There is not enough data in this cut and period to build a bridge.', spoken: 'There is not enough data for a bridge here.', drivers: [], contributors: [], visual: null, followUps: [] }; }

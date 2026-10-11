@@ -56,7 +56,7 @@ function scopeIn(cut) { const l = scopeLabel(cut); return l ? ' in' + l.slice(1)
 function scopeLabel(cut) {
   if (!cut) return '';
   const parts = [];
-  for (const d of ['region', 'unit', 'office', 'practice', 'industry', 'level', 'client']) if (cut[d] && typeof cut[d] === 'string') parts.push(ref.labelOf(d, cut[d]));
+  for (const d of ['region', 'unit', 'office', 'practice', 'industry', 'level', 'client']) { if (d === 'region' && (cut.unit || cut.office)) continue; if (cut[d] && typeof cut[d] === 'string') parts.push(ref.labelOf(d, cut[d])); }
   if (cut.engagement) parts.push(Array.isArray(cut.engagement) ? cut.engagement.join(', ') : cut.engagement);
   return parts.length ? ', ' + parts.join(', ') : '';
 }

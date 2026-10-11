@@ -148,7 +148,7 @@ function parse(question, ctx = {}) {
   const intent = parseIntent(q, { metrics, cut });
   const compare = /against plan|vs\.? plan|versus plan|to plan|plan attainment|behind plan|miss plan|on track/.test(t) ? 'plan' : /year on year|compared with last year|vs\.? last year|than last year|versus last year/.test(t) ? 'ly' : /three years ago|compared with 3 years/.test(t) ? 'ly3' : null;
   // "same for X" / "only Principals": inherit from memory
-  const followUp = /^(now |and )?(show|do) (me )?the same (for|in)|^only |^just |^and (for|in) |^what about|^now for|^same for|^(yeah,? |yes,? |ok,? |please )*(break|split|cut|slice) (it|this|that|the gap|that gap|this gap) (down |up )?(by|as per|per|across)/.test(t) || /^(will|does|is|can) (it|this|that)\b/.test(t) || /^what should i do about (it|this|that)/.test(t) || /^(tell me more|explain (that|this|it)|why\?*$|drill into this|why this dip)/.test(t);
+  const followUp = /^(now |and )?(show|do) (me )?the same (for|in)|^only |^just |^and (for|in) |^what about|^now for|^same for|^(yeah,? |yes,? |ok,? |please )*(break|split|cut|slice) (it|this|that|the gap|that gap|this gap) (down |up )?(by|as per|per|across)/.test(t) || /^(will|does|is|can) (it|this|that)\b/.test(t) || /^what should i do about (it|this|that)/.test(t) || /^(tell me more|explain (that|this|it)|why\?*$|drill into|why this dip)/.test(t);
   const flags = {
     individual_people: /highest.?risk|list (the|them)|show me the (people|individuals|names)|flight risk of my colleagues|who on my team|which (people|individuals)|by person|each person|per person|named people|show me who/.test(t),
     partner_comp: /credit fell|partners whose|origination credit|partner compensation|distribution/.test(t),
