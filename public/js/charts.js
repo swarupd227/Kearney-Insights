@@ -32,7 +32,9 @@ export function render(el, spec, { onPoint } = {}) {
   const opt = buildOption(spec);
   if (opt instanceof Promise) { opt.then(o => { chart.setOption(o); }); } else chart.setOption(opt);
   if (onPoint) chart.on('click', p => { const key = (spec.keys && spec.keys[p.dataIndex]) || (spec.points && spec.points[p.dataIndex] && (spec.points[p.dataIndex].unit || spec.points[p.dataIndex].id)) || p.name; onPoint({ dim: spec.dim || (spec.type === 'map' ? 'unit' : null), key, label: p.name, value: p.value, event: p.event && p.event.event }); });
-  const ro = new ResizeObserver(() => chart.resize()); ro.observe(el);
+  // Resize only when the container's size really changes: the observer fires once immediately after observe(), and resize() would cancel the build-in animation.
+  let lastW = el.clientWidth, lastH = el.clientHeight;
+  const ro = new ResizeObserver(() => { const w = el.clientWidth, hgt = el.clientHeight; if (w === lastW && hgt === lastH) return; lastW = w; lastH = hgt; chart.resize({ animation: { duration: 0 } }); }); ro.observe(el);
   return chart;
 }
 // PNG of a rendered chart (for the slide export); null if the element has no chart.
