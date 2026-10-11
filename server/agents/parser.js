@@ -74,6 +74,8 @@ function parseMetrics(q) {
 
 function parseIntent(q, parsed) {
   const t = q.toLowerCase();
+  if (/^(please )?(approve|reject|confirm|dismiss|accept)\b/.test(t) && /action|draft|match|candidate|share|proposal|assignment/.test(t)) return 'action_centre';
+  if (/^confirm (share|it|that|this)$/.test(t)) return 'action_centre';
   if (/what (should|can|do) i do|what should we do|draft|propose actions?|recommend(ed)? actions?|fix (it|this)/.test(t)) return 'act';
   if (/approve|reject/.test(t) && /action/.test(t)) return 'action_centre';
   if (/what if|what would|scenario|freeze|if we (raise|increase|cut|reduce|lower)|raise rates|rate increase|compare a .*with|happens to (profit|margin|revenue|leverage|utilisation|utilization)|if i (add|roll off|remove)|add one|roll off one|drops? \d+ points|improvement in realisation/.test(t)) return 'simulate';

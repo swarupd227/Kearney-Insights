@@ -61,7 +61,15 @@ async function decide(id, decision, persona, edit) {
   await db.query('INSERT INTO audit_log (persona, event, detail) VALUES ($1,$2,$3)', [persona.id, 'action_' + status, JSON.stringify({ action_id: id, title: a.title, connector: a.connector, approver: persona.title })]);
   return row;
 }
+// The staffing manager confirms a proposed match; the Action Agent records the assignment in the staffing stub (nothing is sent in demo mode).
+async function confirmMatch(persona, candidate, context) {
+  const title = `Assign ${candidate.id} (${candidate.level_name || candidate.level}, ${candidate.office_name || candidate.office}) to ${context || 'the requested role'}`;
+  const row = await db.one('INSERT INTO actions (persona, trigger_insight, action_type, title, body, owner, due_date, status, connector, decided_at, decided_by, payload) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,now(),$10,$11) RETURNING *',
+    [persona.id, context || 'Staffing match', 'staffing_assignment', title, `Proposed by the Staffing Match Agent: ${(candidate.reasons || []).join('; ')}. Confirmed by the ${persona.title}.`, persona.title, due(1), 'approved', 'Staffing system (generic interface)', persona.title, JSON.stringify({ candidate: candidate.id, connector_result: 'Recorded by the staffing stub; nothing sent (demo mode)', recorded_at: new Date().toISOString() })]);
+  await db.query('INSERT INTO audit_log (persona, event, detail) VALUES ($1,$2,$3)', [persona.id, 'action_approved', JSON.stringify({ action_id: row.id, title, connector: row.connector, approver: persona.title })]);
+  return row;
+}
 const POLICY = [
   { agent: 'Action Agent', may_read: 'Outputs of other agents, role profile', may_draft: 'Staffing changes, pricing review notes, retention conversation briefs, pipeline tasks, forecast updates, reminders, introduction notes', may_execute: 'Nothing. Every action is a draft until a named approver approves it', connectors: 'Workday, Salesforce, ServiceNow, Teams, Outlook, Anaplan, staffing system (stubs in demo mode)', approvers: 'The named owner on each draft; the approval is logged with the approver title and time' }
 ];
-module.exports = { draftFromContext, list, decide, POLICY };
+module.exports = { draftFromContext, list, decide, confirmMatch, POLICY };

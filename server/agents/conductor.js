@@ -58,7 +58,7 @@ async function ask({ question, personaId, sessionId = 'default', context = {} })
   // dictionary parse as a hint (and as the fallback if the model returns nothing usable). Follow-ups keep their context.
   llm.takeUsage();
   const routed = /open the|go to|take me to|action centre|pin this|make this weekly|turn this into a slide|share this|how was this calculated|lineage/.test(question.toLowerCase());
-  if (!routed && !parsed.followUp && await llm.enabled()) {
+  if (!routed && !parsed.followUp && await llm.enabled() && await llm.plannerEnabled()) {
     const r = ref.get(); const st = await llm.status();
     const dims = { region: r.regions.map(x => x.id), unit: r.units.map(x => x.id), practice: r.practices.map(x => x.id), industry: r.industries.map(x => x.id), level: ['PARTNER', 'AP', 'PRINCIPAL', 'MANAGER', 'ASSOCIATE', 'BA'], client: r.clients.filter(c => c.is_public).map(c => c.id) };
     const hint = { intent: parsed.intent, metrics: parsed.metrics, cut: parsed.cut, groupBy: parsed.groupBy, period: parsed.period, compare: parsed.compare };
@@ -104,7 +104,7 @@ async function ask({ question, personaId, sessionId = 'default', context = {} })
     duration_ms: Date.now() - t0, usage: llm.takeUsage(), llm: llmOn ? (await llm.status()).label : null, plannedBy: parsed.plannedBy || 'dictionary parser'
   };
   answer.cost_usd = answer.usage ? Math.round(answer.usage.cost * 10000) / 10000 : 0;
-  memory.last = { question, intent: parsed.intent, metrics: parsed.metrics, cut: parsed.cut, period: parsed.period, kind: answer.kind, client: parsed.cut.client || (memory.last && memory.last.client), lineage: answer.lineage, contributors: out.contributors || null, engagements: out.engagements || null, units: out.units || null, ranked: out.ranked || null, people: out.people || null, nextBest: out.nextBest || null, clientObj: out.client || null, narrative: answer.headline, compare: parsed.compare || (memory.last && memory.last.compare) };
+  memory.last = { question, intent: parsed.intent, metrics: parsed.metrics, cut: parsed.cut, period: parsed.period, kind: answer.kind, client: parsed.cut.client || (memory.last && memory.last.client), lineage: answer.lineage, contributors: out.contributors || null, engagements: out.engagements || null, units: out.units || null, ranked: out.ranked || null, people: out.people || null, candidates: out.candidates || (memory.last && parsed.intent === 'action_centre' ? memory.last.candidates : null), roleText: out.roleText || (memory.last && parsed.intent === 'action_centre' ? memory.last.roleText : null), nextBest: out.nextBest || null, clientObj: out.client || null, narrative: answer.headline, compare: parsed.compare || (memory.last && memory.last.compare) };
   memory.history.push({ question, kind: answer.kind });
   await logRun(persona, question, parsed.intent, tl, answer, false);
   return answer;
@@ -127,6 +127,28 @@ async function execute(plan, parsed, persona, memory, tl, context) {
   const scopeDefault = () => persona.scope.region ? { region: persona.scope.region } : persona.scope.practice ? { practice: persona.scope.practice } : {};
 
   switch (parsed.intent) {
+    case 'action_centre': {
+      const ord = /\b(second|2nd)\b/.test(t) ? 1 : /\b(third|3rd)\b/.test(t) ? 2 : /\blast\b/.test(t) ? -1 : /\ball\b/.test(t) ? 'all' : 0;
+      const verb = /reject|dismiss/.test(t) ? 'reject' : 'approve';
+      if (/match|candidate|assignment/.test(t)) {
+        const cands = last && last.candidates; if (!cands || !cands.length) return { headline: 'Ask the Staffing Match Agent for candidates first, for example "Who can start on a procurement engagement in Riyadh on Monday?", then confirm a match.', spoken: 'Ask for candidates first.', kind: 'action_centre', visual: null, table: null, followUps: ['Who can start on a procurement engagement in Riyadh on Monday?'] };
+        const c = ord === -1 ? cands[cands.length - 1] : cands[typeof ord === 'number' ? ord : 0];
+        const row = await tl.run('Action Agent', 'Recorded the confirmed assignment in the staffing stub', () => action.confirmMatch(persona, c, last.roleText || 'the requested role'));
+        return { headline: `Confirmed: ${row.title}. The Action Agent recorded the assignment in the staffing system stub (nothing is sent in demo mode) and logged your approval.`, spoken: `${c.id} is confirmed for the role. The assignment is recorded and logged.`, kind: 'action_centre', screen: 'actions', visual: null, table: null, followUps: ['Open the action centre', 'Show supply and demand by skill for the next eight weeks', 'Who is rolling off in the next three weeks?'] };
+      }
+      if (/share/.test(t)) {
+        await guardian.log(persona.id, 'share_confirmed', { question: last ? last.question : null });
+        tl.note('Dashboard Composer Agent', 'Applied the recipients’ row-level security and shared the board (stub)');
+        const sharedQ = [...memory.history].reverse().map(x => x.question).find(q => !/share|confirm/i.test(q)) || 'the last answer';
+        return { headline: `Shared "${sharedQ}" with the named team. Each recipient sees it under their own row-level security; the share is recorded in the audit trail. (In demo mode nothing leaves the product.)`, spoken: 'Shared, under each recipient’s own access rights.', kind: 'action_centre', visual: null, table: null, followUps: ['Pin this to my board', 'Make this weekly', 'Open my board'] };
+      }
+      const pending = (await action.list(persona)).filter(a => a.status === 'pending');
+      if (!pending.length) return { headline: 'There are no drafted actions waiting for approval. Ask "What should I do about it?" after an insight and the Action Agent will draft some.', spoken: 'Nothing is waiting for approval.', kind: 'action_centre', screen: 'actions', visual: null, table: null, followUps: ['What should I do about it?', 'Open the action centre', 'Show me what the agents did today'] };
+      const targets = ord === 'all' ? pending : [ord === -1 ? pending[pending.length - 1] : pending[Math.min(typeof ord === 'number' ? ord : 0, pending.length - 1)]];
+      const done = []; for (const a of targets) done.push(await tl.run('Action Agent', `${verb === 'approve' ? 'Approved' : 'Rejected'} "${a.title}" and ${verb === 'approve' ? 'recorded it in the ' + a.connector + ' stub' : 'logged the decision'}`, () => action.decide(a.id, verb, persona)));
+      const remaining = pending.length - targets.length;
+      return { headline: `${verb === 'approve' ? 'Approved' : 'Rejected'}: ${done.map(a => a.title).join('; ')}. ${verb === 'approve' ? `Recorded by the ${done[0].connector} stub; nothing is sent in demo mode.` : ''} ${remaining} draft${remaining === 1 ? '' : 's'} still waiting.`, spoken: `${verb === 'approve' ? 'Approved' : 'Rejected'} ${done.length === 1 ? 'the action' : done.length + ' actions'}. ${remaining ? remaining + ' still waiting for you.' : 'Nothing else is waiting.'}`, kind: 'action_centre', screen: 'actions', visual: null, table: null, followUps: remaining ? ['Approve the next action', 'Reject the next action', 'Open the action centre'] : ['Open the action centre', 'Show me what the agents did today', 'What has changed since Friday?'] };
+    }
     case 'chat': {
       const st = await llm.status();
       const text = await tl.run('Briefing Agent', `Answered conversationally with ${st.label}, grounded in the last answer`, () => llm.converse(parsed.question, { persona, lastAnswer: last ? last.narrative : null, history: memory.history.slice(-4).map(x => x.question) }));
@@ -151,6 +173,13 @@ async function execute(plan, parsed, persona, memory, tl, context) {
       tl.note('Briefing Agent', 'Exported the last answer as a slide (headline, visual, lineage footnote)'); return { headline: `Slide export prepared for "${last ? last.question : 'the last answer'}": headline, visual, agent timeline and a lineage footnote with the Seeded badge. The export is available from the answer card.`, spoken: 'Slide export is ready on the card.', kind: 'slide', visual: null, table: null, followUps: ['Pin this to my board', 'Read the brief again, shorter', 'Open the firm pulse'] };
     }
     case 'brief': {
+      if (/what has changed|what changed|since (friday|monday|yesterday|last week)/.test(t)) {
+        const alerts = await tl.run('Trend and Anomaly Agent', 'Scanned the headline metrics for new movements outside their expected range', () => trend.feed(persona, { limit: 5 }));
+        const acts = await action.list(persona); const pend = acts.filter(a => a.status === 'pending'); const decided = acts.filter(a => a.decided_at && (Date.now() - new Date(a.decided_at)) < 7 * 86400000);
+        const eh = await tl.run('Engagement Health Agent', 'Re-scored live engagements', () => engagement.board({ cut: persona.scope.region ? { region: persona.scope.region } : persona.scope.engagements ? { engagement: persona.scope.engagements } : {}, limit: 3 }));
+        const items = [...alerts.map(a => a.text), `${eh.atRisk} live engagements carry an overrun probability above 50%${eh.engagements[0] ? ', led by ' + eh.engagements[0].id : ''}.`, `${pend.length} drafted action${pend.length === 1 ? '' : 's'} waiting for approval${decided.length ? ' and ' + decided.length + ' decided this week' : ''}.`];
+        return { headline: `Since Friday: ${items.join(' ')}`, spoken: `Since Friday: ${items.slice(0, 2).map(s => s.split('(')[0]).join(' ')}`, kind: 'brief', visual: null, table: null, followUps: [alerts[0] ? `Why did ${alerts[0].name.toLowerCase()} move?` : 'Are we on track for the year?', 'Open the action centre', 'Read the brief again, shorter'] };
+      }
       const r = await tl.run('Briefing Agent', 'Composed the morning brief from the integration points', () => briefing.morningBrief(persona, { shorter: parsed.flags.shorter }));
       if (/tell me more about the first/.test(t)) { parsed.intent = 'explain'; parsed.metrics = ['plan_attainment']; parsed.compare = 'plan'; parsed.cut = scopeDefault(); plan.kind = 'explain'; return execute(plan, parsed, persona, memory, tl, context); }
       return { headline: r.text, spoken: r.text, kind: 'brief', brief: r, visual: null, table: null, followUps: ['Tell me more about the first point', 'Read the brief again, shorter', 'What has changed since Friday?'] };
@@ -167,7 +196,8 @@ async function execute(plan, parsed, persona, memory, tl, context) {
       if (/rolling off|roll.?off/.test(t)) { const weeks = parsed.horizon && parsed.horizon.weeks ? parsed.horizon.weeks : 3; const r = await tl.run('Staffing Match Agent', 'Listed people rolling off against the roll-off calendar', () => staffing.rollingOff({ cut: { ...cut, level: undefined }, weeks, skills: parsed.skills, level: cut.level || null })); return { ...r, headline: r.narrative, screen: 'staffing', kind: 'match' }; }
       const office = ref.get().offices.find(o => cut.office === o.id);
       const r = await tl.run('Staffing Match Agent', 'Matched available people to the role by skill, level, location, language and availability', () => staffing.candidates({ skills: parsed.skills.length ? parsed.skills : (cut.practice ? [ref.labelOf('practice', cut.practice)] : []), level: cut.level || null, location: office ? office.city : null, unit: cut.unit || null, language: /arabic/.test(t) ? 'Arabic' : null, practice: cut.practice || null }));
-      return { ...r, headline: r.narrative, screen: 'staffing', kind: 'match' };
+      const roleText = `${parsed.skills.length ? parsed.skills.join(' and ') + ' ' : ''}${cut.level ? ref.labelOf('level', cut.level) + ' ' : ''}role${office ? ' in ' + office.city : cut.unit ? ' in ' + ref.labelOf('unit', cut.unit) : ''}${r.start ? ' from ' + require('./util').dateLabel(r.start) : ''}`;
+      return { ...r, headline: r.narrative, screen: 'staffing', kind: 'match', roleText };
     }
     case 'knowledge': { const r = await tl.run('Query Agent', 'Searched registered assets, Glean topics and expert skills', () => observatory.knowledgeSearch(parsed.question)); return { ...r, headline: r.narrative, kind: 'knowledge' }; }
     case 'act': {

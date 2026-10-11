@@ -21,6 +21,8 @@ async function current() {
   return { provider: 'none', source: 'none' };
 }
 async function enabled() { return (await current()).provider !== 'none'; }
+// Planner on: the model plans every question (slower). Off: dictionary planner, the model only writes the spoken answer.
+async function plannerEnabled() { const s = await settings.get('llm', null); return !(s && s.planner === false); }
 async function status() { const c = await current(); return { provider: c.provider, model: c.model || null, endpoint: c.endpoint ? c.endpoint.replace(/\/+$/, '') : null, configured: c.provider !== 'none', source: c.source, keyMasked: c.apiKey ? c.apiKey.slice(0, 4) + '…' + c.apiKey.slice(-4) : null, label: labelFor(c), lastError: c.provider !== 'none' ? lastError : null, paused: Date.now() < pausedUntil }; }
 function labelFor(c) { if (c.provider === 'none') return 'off'; return `${{ 'azure-openai': 'Azure OpenAI', openai: 'OpenAI', anthropic: 'Anthropic Claude' }[c.provider]} · ${c.model}`; }
 
@@ -130,4 +132,4 @@ async function converse(question, { persona, lastAnswer, history }) {
     { role: 'user', content: question }
   ], { maxTokens: 400, effort: 'low' });
 }
-module.exports = { chat, polishNarrative, planFallback, converse, enabled, status, test, current, takeUsage, clearError, DEFAULT_MODELS };
+module.exports = { chat, polishNarrative, planFallback, converse, enabled, plannerEnabled, status, test, current, takeUsage, clearError, DEFAULT_MODELS };

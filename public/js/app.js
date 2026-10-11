@@ -17,9 +17,10 @@ import * as actions from './screens/actions.js';
 import * as board from './screens/board.js';
 import * as observatory from './screens/observatory.js';
 import * as settingsScreen from './screens/settings.js';
+import * as runbook from './screens/runbook.js';
 import { setTheme } from './charts.js';
 
-const SCREENS = { home, canvas, firm, region, practice, account, engagements, talent, staffing, pipeline: pipelineS, forecast: forecastS, cash, actions, board, observatory, settings: settingsScreen };
+const SCREENS = { home, canvas, firm, region, practice, account, engagements, talent, staffing, pipeline: pipelineS, forecast: forecastS, cash, actions, board, observatory, settings: settingsScreen, runbook };
 const main = document.getElementById('main');
 let voice; let briefSpokenFor = new Set();
 
@@ -42,6 +43,7 @@ async function boot() {
   updateActionCount();
   route();
   if (!localStorage.getItem('astra.persona')) openPersonaModal();
+  const pendingAsk = sessionStorage.getItem('astra.pendingAsk'); if (pendingAsk) { sessionStorage.removeItem('astra.pendingAsk'); setTimeout(() => ask(pendingAsk), 800); }
 }
 function route() { const m = location.hash.match(/^#\/([a-z]+)(?:\/(.*))?/); const screen = m ? m[1] : 'home'; const params = m && m[2] ? Object.fromEntries(new URLSearchParams(m[2])) : {}; show(screen, params); }
 export function go(screen, params = {}) { const q = new URLSearchParams(params).toString(); location.hash = '#/' + screen + (q ? '/' + q : ''); }
