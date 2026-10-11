@@ -36,7 +36,7 @@ const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'S
 function monthLabel(s) { const d = new Date(s + 'T00:00:00Z'); return MONTHS_SHORT[d.getUTCMonth()] + ' ' + d.getUTCFullYear(); }
 function quarterLabel(s) { const d = new Date(s + 'T00:00:00Z'); return 'Q' + (Math.floor(d.getUTCMonth() / 3) + 1) + ' ' + d.getUTCFullYear(); }
 function priorYear(p) { return { from: addMonths(p.from, -12), to: addMonths(p.to, -12), label: p.label + ', prior year' }; }
-function priorPeriod(p) { const n = monthsBetween(p.from, p.to) + 1; return { from: addMonths(p.from, -n), to: addMonths(p.to, -n), label: 'prior period' }; }
+function priorPeriod(p) { const n = monthsBetween(p.from, p.to) + 1; const from = addMonths(p.from, -n), to = addMonths(p.to, -n); const label = n === 1 ? monthLabel(from) : (n === 3 && from === quarterStart(from)) ? quarterLabel(from) : n === 12 ? 'prior twelve months' : `${monthLabel(from)} to ${monthLabel(to)}`; return { from, to, label }; }
 function monthsBetween(a, b) { const da = new Date(a + 'T00:00:00Z'), dbb = new Date(b + 'T00:00:00Z'); return (dbb.getUTCFullYear() - da.getUTCFullYear()) * 12 + dbb.getUTCMonth() - da.getUTCMonth(); }
 
 // ---------- filter builders ----------

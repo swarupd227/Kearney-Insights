@@ -82,7 +82,9 @@ function waterfall(s) {
   const pct = s.format === 'pct';
   steps.forEach(st => { if (st.kind === 'start' || st.kind === 'end') { inv.push(0); vis.push({ value: st.value, itemStyle: { color: st.kind === 'start' ? T.muted : T.accent, borderRadius: 4 } }); run = st.value; } else { const v = st.value; const b = v >= 0 ? run : run + v; inv.push(b); vis.push({ value: Math.abs(v), itemStyle: { color: v >= 0 ? T.good : T.bad, borderRadius: 4 }, real: v }); run += v; } });
   const minBase = pct ? Math.max(0, Math.min(...steps.filter(x => x.kind !== 'delta').map(x => x.value)) - 0.15) : 0;
-  o.xAxis = { type: 'category', data: names, ...axisStyleOf(), axisLabel: { ...axisStyleOf().axisLabel, interval: 0, width: 110, overflow: 'break', fontSize: 10.5 } }; o.yAxis = { type: 'value', ...axisStyleOf(), min: pct ? minBase : undefined, axisLabel: { ...axisStyleOf().axisLabel, formatter: axisFmt(s.format) } };
+  const many = names.length > 7;
+  o.xAxis = { type: 'category', data: names, ...axisStyleOf(), axisLabel: { ...axisStyleOf().axisLabel, interval: 0, width: many ? 120 : 110, overflow: many ? 'truncate' : 'break', rotate: many ? 28 : 0, fontSize: 10.5 } };
+  if (many) o.grid.bottom = 36; o.yAxis = { type: 'value', ...axisStyleOf(), min: pct ? minBase : undefined, axisLabel: { ...axisStyleOf().axisLabel, formatter: axisFmt(s.format) } };
   o.series = [{ type: 'bar', stack: 'w', data: inv.map(v => pct ? v : v), itemStyle: { color: 'transparent' }, silent: true, barMaxWidth: 46 }, { type: 'bar', stack: 'w', data: vis, barMaxWidth: 46, label: { show: true, position: 'top', color: T.muted, fontSize: 10.5, formatter: p => { const st = steps[p.dataIndex]; return st.kind === 'delta' ? (pct ? fmt.pts(st.value) : (st.value >= 0 ? '+' : '') + fmt.money(st.value)) : f(st.value, s.format); } } }];
   o.tooltip.formatter = p => { const st = steps[p.dataIndex]; return `${st.label}: ${st.kind === 'delta' ? (pct ? fmt.pts(st.value) : fmt.money(st.value)) : f(st.value, s.format)}`; };
   o.grid.top = 28; return o;
