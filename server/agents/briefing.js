@@ -63,6 +63,20 @@ function metricNarrative(result, { compare = null, compareValue = null, compareL
   if (!rows.length) return { text: `No data for ${m.name.toLowerCase()}${where} in ${result.period.label}.`, spoken: `There is no data for that yet.` };
   if (result.groupBy && result.groupBy !== 'all' && rows.length > 1) {
     const timeDim = ['month', 'quarter', 'year'].includes(result.groupBy);
+    if (timeDim && rows.length >= 3) {
+      const additive = m.format === 'money' && !['revenue_per_partner', 'revenue_per_professional', 'profit_per_partner', 'effective_rate', 'eac', 'fx_impact'].includes(m.id);
+      const last = rows[rows.length - 1], prev = rows[rows.length - 2];
+      const lo = rows.reduce((a, r) => (r.value < a.value ? r : a), rows[0]), hi = rows.reduce((a, r) => (r.value > a.value ? r : a), rows[0]);
+      const sum = rows.reduce((a, r) => a + r.value, 0), avg = sum / rows.length;
+      const step = result.groupBy === 'month' ? 'month' : result.groupBy;
+      const d = last.value - prev.value;
+      const change = m.format === 'pct' ? pts(d) : (d >= 0 ? 'up ' : 'down ') + fmt(Math.abs(d), m.format);
+      const text = additive
+        ? `${m.name}${where} totalled ${fmt(sum, m.format)} over ${result.period.label || 'the period'}, averaging ${fmt(avg, m.format)} a ${step}, from a low of ${fmt(lo.value, m.format)} in ${lbl(lo.key, result.groupBy)} to a high of ${fmt(hi.value, m.format)} in ${lbl(hi.key, result.groupBy)}. ${lbl(last.key, result.groupBy)} came in at ${fmt(last.value, m.format)}, ${change} on ${lbl(prev.key, result.groupBy)}${compareValue !== null && compareValue !== undefined ? `; the period total is against ${compareLabel} of ${fmt(compareValue, m.format)}` : ''}.`
+        : `${m.name}${where} averaged ${fmt(avg, m.format)} over ${result.period.label || 'the period'}, ranging from ${fmt(lo.value, m.format)} in ${lbl(lo.key, result.groupBy)} to ${fmt(hi.value, m.format)} in ${lbl(hi.key, result.groupBy)}. ${lbl(last.key, result.groupBy)} stands at ${fmt(last.value, m.format)}, ${change} on ${lbl(prev.key, result.groupBy)}${compareValue !== null && compareValue !== undefined ? `, against ${compareLabel} of ${fmt(compareValue, m.format)}` : ''}.`;
+      const worry = m.higherIsBetter === (d >= 0) ? '' : ` Ask me why ${lbl(last.key, result.groupBy)} moved.`;
+      return { text, spoken: `${m.name}${where}: ${lbl(last.key, result.groupBy)} was ${fmt(last.value, m.format)}, ${change} on the ${step} before. The ${result.period.label || 'period'} low was ${lbl(lo.key, result.groupBy)} and the high ${lbl(hi.key, result.groupBy)}.${worry}` };
+    }
     if (timeDim) {
       const first = rows[0], last = rows[rows.length - 1]; const delta = last.value - first.value;
       const text = `${m.name}${where} was ${fmt(last.value, m.format)} in ${lbl(last.key, result.groupBy)}, ${m.format === 'pct' ? pts(delta) : (delta >= 0 ? 'up ' : 'down ') + fmt(Math.abs(delta), m.format)} from ${lbl(first.key, result.groupBy)}${compareValue !== null && compareValue !== undefined ? `, against ${compareLabel} of ${fmt(compareValue, m.format)}` : ''}.`;
