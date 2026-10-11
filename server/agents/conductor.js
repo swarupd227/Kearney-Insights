@@ -52,7 +52,7 @@ async function ask({ question, personaId, sessionId = 'default', context = {} })
   // follow-ups inherit the last cut and metric
   if (parsed.followUp && memory.last) { parsed.cut = { ...memory.last.cut, ...parsed.cut }; if (!parsed.metrics.length && memory.last.metrics) parsed.metrics = memory.last.metrics; parsed.period = parsed.period || memory.last.period; }
   // "only Principals" / "now show the same for Asia Pacific" keep the previous intent
-  if (parsed.followUp && memory.last && /^(now |and )?(show|do) (me )?the same|^only |^just |^what about|^same for|^now for|^and (for|in) /.test(question.toLowerCase())) parsed.intent = memory.last.intent || parsed.intent;
+  if (parsed.followUp && memory.last && /^(now |and )?(show|do) (me )?the same|^only |^just |^what about|^same for|^now for|^and (for|in) |(break|split|cut|slice) (it|this|that|the gap|that gap|this gap) (down |up )?(by|as per|per|across)/.test(question.toLowerCase())) { parsed.intent = memory.last.intent || parsed.intent; if (memory.last.compare && !parsed.compare) parsed.compare = memory.last.compare; }
 
   // Language-model planner: when a provider is configured in Settings the Conductor plans every question with it, using the
   // dictionary parse as a hint (and as the fallback if the model returns nothing usable). Follow-ups keep their context.
@@ -192,7 +192,8 @@ async function execute(plan, parsed, persona, memory, tl, context) {
       const period = parsed.period || (compare === 'plan' ? 'qtd' : 'last_quarter');
       await tl.run('Metric Agent', `Resolved "${catalogue.byId[metric].name}" to its governed definition`, async () => null);
       tl.note('Query Agent', 'Read both periods under row-level security');
-      const r = await tl.run('Variance Agent', 'Split the change into drivers and ranked the contributors', () => variance.explain({ metricId: metric, cut: scopeCut, period, compare: compare || 'prior' }));
+      const by = parsed.groupBy && !['month', 'quarter', 'year'].includes(parsed.groupBy) ? parsed.groupBy : null;
+      const r = await tl.run('Variance Agent', 'Split the change into drivers and ranked the contributors' + (by ? ' by ' + by : ''), () => variance.explain({ metricId: metric, cut: scopeCut, period, compare: compare || 'prior', by }));
       tl.note('Dashboard Composer Agent', 'Built the waterfall bridge and contributor table');
       return { ...r, headline: r.narrative, screen: metric === 'billing_realisation' ? 'region' : 'canvas', kind: metric === 'billing_realisation' ? 'variance_realisation' : (compare === 'plan' ? 'plan_gap' : 'variance'), extra: { metric } };
     }

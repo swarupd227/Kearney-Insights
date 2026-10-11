@@ -13,12 +13,12 @@ const ref = require('../metrics/refcache');
 const composer = require('./composer');
 const { money, pct, pts, listWords } = require('./util');
 
-async function explain({ metricId, cut = {}, period, comparePeriod, compare = 'prior' }) {
+async function explain({ metricId, cut = {}, period, comparePeriod, compare = 'prior', by = null }) {
   const p = typeof period === 'string' || !period ? engine.periodFor(period || 'last_quarter') : period;
   const pA = comparePeriod || (compare === 'plan' ? null : compare === 'ly' ? engine.priorYear(p) : engine.priorPeriod(p));
   switch (metricId) {
     case 'billing_realisation': return realisation(cut, pA, p);
-    case 'net_fee_revenue': case 'plan_attainment': return compare === 'plan' || metricId === 'plan_attainment' ? revenueVsPlan(cut, p) : revenueVsPeriod(cut, pA, p);
+    case 'net_fee_revenue': case 'plan_attainment': return compare === 'plan' || metricId === 'plan_attainment' ? (by && by !== 'unit' ? revenueVsPlanBy(cut, p, by) : revenueVsPlan(cut, p)) : revenueVsPeriod(cut, pA, p);
     case 'utilisation': return utilisation(cut, pA, p);
     case 'profit_per_partner': return profitPerPartner(cut, pA, p);
     case 'contribution_margin': return margin(cut, pA, p);
@@ -93,6 +93,38 @@ async function revenueVsPlan(cut, p) {
     table: composer.table('Units against plan', p.label, [['label', 'Unit'], ['actual', 'Actual', 'money'], ['plan', 'Plan', 'money'], ['gap', 'Gap', 'money'], ['attainment', 'Attainment', 'pct'], ['volume_effect', 'Volume effect', 'money'], ['realisation_effect', 'Realisation effect', 'money']], units, lineageFor('plan_attainment', cut, p, ['engagement_months', 'plan'])),
     followUps: [behind.length ? `Why did realisation drop in ${[...behind].sort((a, b) => a.realisation_effect - b.realisation_effect)[0].label} last quarter?` : 'Show revenue by unit', 'Forecast revenue to year end', 'What should I do about it?']
   };
+}
+// Plan is held by unit; for another dimension (practice, industry) each unit's plan is allocated across members by their
+// share of that unit's prior-year revenue, so the gap can be attributed to the practices that are bringing it down.
+async function revenueVsPlanBy(cut, p, by) {
+  const dimName = by === 'industry' ? 'industry' : 'practice';
+  const pLY = engine.priorYear(p);
+  const [cur, lyRows, planRows] = await Promise.all([engine.emAgg(cut, p, dimName), engine.emAgg(cut, pLY, dimName), planByUnit(cut, p)]);
+  const totalPlan = Object.values(planRows).reduce((a, v) => a + v, 0);
+  const lyTotal = lyRows.reduce((a, r) => a + r.billed, 0);
+  const lyMap = Object.fromEntries(lyRows.map(r => [r.key, r]));
+  const members = cur.map(r => {
+    const l = lyMap[r.key]; const share = lyTotal ? (l ? l.billed : 0) / lyTotal : 1 / cur.length; const plan = totalPlan * share;
+    const realPlan = l && l.std ? l.billed / l.std : 0.9; const realAct = r.std ? r.billed / r.std : realPlan; const stdPlan = plan / realPlan;
+    return { member: r.key, label: ref.labelOf(dimName, r.key), actual: r.billed, plan, gap: r.billed - plan, attainment: plan ? r.billed / plan : null, growth: l && l.billed ? r.billed / l.billed - 1 : null, volume_effect: (r.std - stdPlan) * realPlan, realisation_effect: r.std * (realAct - realPlan), realisation: realAct };
+  }).sort((a, b) => a.gap - b.gap);
+  const totalActual = members.reduce((s, m) => s + m.actual, 0); const gap = totalActual - totalPlan;
+  const behind = members.filter(m => m.gap < 0); const best = members[members.length - 1];
+  const steps = [{ label: 'Plan', value: totalPlan, kind: 'start' }];
+  for (const m of members.slice(0, 7)) steps.push({ label: m.label, value: m.gap, kind: 'delta' });
+  const rest = members.slice(7).reduce((s, m) => s + m.gap, 0); if (members.length > 7) steps.push({ label: 'Other ' + dimName + 's', value: rest, kind: 'delta' });
+  steps.push({ label: 'Actual', value: totalActual, kind: 'end' });
+  const scope = composer.scopeLabel(cut).replace(/^, /, '') || 'The firm';
+  const Dim = dimName[0].toUpperCase() + dimName.slice(1);
+  const narrative = `${scope}: revenue ${money(totalActual)} against ${money(totalPlan)} of plan for ${p.label}, a gap of ${money(gap)} (${pct(totalActual / totalPlan - 1)}), with plan allocated to ${dimName}s by their prior-year mix. ` +
+    (behind.length ? `${listWords(behind.slice(0, 3).map(m => `${m.label} (${money(m.gap)}${m.growth !== null ? ', ' + pct(m.growth) + ' year on year' : ''})`))} ${behind.length > 1 ? 'are' : 'is'} bringing it down. ` : `Every ${dimName} is at or above its allocated plan. `) +
+    (best && best.gap > 0 ? `${best.label} is ahead by ${money(best.gap)}.` : '');
+  const spoken = `${scope} is ${money(Math.abs(gap))} ${gap < 0 ? 'behind' : 'ahead of'} plan. ${behind[0] ? behind[0].label + ' is the largest drag at ' + money(behind[0].gap) + '.' : ''} Plan was allocated to ${dimName}s by the prior-year mix.`;
+  const lin = lineageFor('plan_attainment', cut, p, ['engagement_months', 'plan']);
+  return { agent: 'Variance Agent', metric: 'plan_attainment', period: p, total: { actual: totalActual, plan: totalPlan, gap }, units: members, contributors: members, narrative, spoken,
+    visual: composer.waterfall(`Plan to actual by ${dimName}${composer.scopeLabel(cut)}`, `${p.label}; plan allocated to ${dimName}s by prior-year revenue mix`, steps, 'money', lin),
+    table: composer.table(`${Dim}s against allocated plan`, p.label, [['label', Dim], ['actual', 'Actual', 'money'], ['plan', 'Allocated plan', 'money'], ['gap', 'Gap', 'money'], ['attainment', 'Attainment', 'pct'], ['growth', 'Growth YoY', 'pct'], ['realisation', 'Realisation', 'pct']], members, lin),
+    followUps: [behind[0] ? `Why did ${behind[0].label} revenue fall?` : `Show revenue by ${dimName}`, 'Break the gap down by unit', 'What should I do about it?'] };
 }
 async function planByUnit(cut, p) {
   const P = new engine.Params();
