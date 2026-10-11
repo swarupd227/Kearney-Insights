@@ -66,7 +66,9 @@ async function ask({ question, personaId, sessionId = 'default', context = {} })
     if (lp && typeof lp === 'object') {
       const INTENTS = ['lookup', 'compare', 'explain', 'predict', 'simulate', 'act', 'brief', 'match', 'client360', 'knowledge', 'observatory', 'it_service', 'chat'];
       const STICKY = ['client360', 'match', 'act', 'action_centre', 'simulate', 'observatory', 'it_service', 'knowledge', 'brief', 'lineage', 'board'];
-      if (INTENTS.includes(lp.intent) && !(STICKY.includes(parsed.intent) && lp.intent !== 'chat')) parsed.intent = lp.intent;
+      // a conversational answer is allowed only when the dictionary found nothing specific (a plain look-up with no metric)
+      if (lp.intent === 'chat') { if (parsed.intent === 'lookup' && !parsed.metrics.length) parsed.intent = 'chat'; }
+      else if (INTENTS.includes(lp.intent) && !STICKY.includes(parsed.intent)) parsed.intent = lp.intent;
       if (Array.isArray(lp.metrics)) parsed.metrics = lp.metrics.filter(m => catalogue.byId[m]);
       if (lp.cut && typeof lp.cut === 'object') for (const [k, v] of Object.entries(lp.cut)) if (dims[k] && dims[k].includes(v)) parsed.cut[k] = v;
       if (['month', 'quarter', 'year', 'region', 'unit', 'office', 'practice', 'industry', 'level', 'client', 'engagement'].includes(lp.groupBy)) parsed.groupBy = lp.groupBy;
