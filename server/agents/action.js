@@ -56,8 +56,15 @@ async function list(persona, { all = false } = {}) {
 }
 async function decide(id, decision, persona, edit) {
   const a = await db.one('SELECT * FROM actions WHERE id=$1', [id]); if (!a) return null;
-  const status = decision === 'approve' ? 'approved' : decision === 'reject' ? 'rejected' : 'edited';
-  const row = await db.one('UPDATE actions SET status=$2, decided_at=now(), decided_by=$3, body=COALESCE($4, body), payload = payload || $5 WHERE id=$1 RETURNING *', [id, status, persona.title, edit || null, JSON.stringify(status === 'approved' ? { connector_result: `Recorded by the ${a.connector} stub; nothing sent (demo mode)`, recorded_at: new Date().toISOString() } : {})]);
+  if (decision === 'edit') {
+    // Editing keeps the draft pending; the edit is logged and the draft is marked as edited by the persona.
+    const e = typeof edit === 'string' ? { body: edit } : (edit || {});
+    const row = await db.one('UPDATE actions SET body=COALESCE($2, body), owner=COALESCE($3, owner), due_date=COALESCE($4, due_date), title=COALESCE($5, title), payload = payload || $6 WHERE id=$1 RETURNING *', [id, e.body || null, e.owner || null, e.due_date || null, e.title || null, JSON.stringify({ edited_by: persona.title, edited_at: new Date().toISOString() })]);
+    await db.query('INSERT INTO audit_log (persona, event, detail) VALUES ($1,$2,$3)', [persona.id, 'action_edited', JSON.stringify({ action_id: id, title: row.title, fields: Object.keys(e) })]);
+    return row;
+  }
+  const status = decision === 'approve' ? 'approved' : 'rejected';
+  const row = await db.one('UPDATE actions SET status=$2, decided_at=now(), decided_by=$3, payload = payload || $4 WHERE id=$1 RETURNING *', [id, status, persona.title, JSON.stringify(status === 'approved' ? { connector_result: `Recorded by the ${a.connector} stub; nothing sent (demo mode)`, recorded_at: new Date().toISOString() } : {})]);
   await db.query('INSERT INTO audit_log (persona, event, detail) VALUES ($1,$2,$3)', [persona.id, 'action_' + status, JSON.stringify({ action_id: id, title: a.title, connector: a.connector, approver: persona.title })]);
   return row;
 }
