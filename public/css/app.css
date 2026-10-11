@@ -195,6 +195,7 @@ table.data td.num, table.data th.num { text-align: right; font-variant-numeric: 
 .feed-item.static { cursor: default; } .feed-item.static:hover { color: inherit; }
 .feed-item .go { float: right; font-size: 11px; color: var(--faint); text-transform: none; letter-spacing: 0; opacity: 0; transition: opacity .15s; }
 .feed-item:hover .go { opacity: 1; }
+table.data td.nowrap { white-space: nowrap; }
 .home-grid { align-items: start; } .home-left { display: grid; gap: 16px; }
 
 /* Actions */

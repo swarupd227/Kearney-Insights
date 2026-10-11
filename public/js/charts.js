@@ -13,7 +13,7 @@ export async function ensureWorld() { if (worldLoaded) return worldLoaded; world
 export const fmt = {
   money: v => v === null || v === undefined || isNaN(v) ? '–' : (Math.abs(v) >= 1e9 ? (v / 1e9).toFixed(2) + 'B' : Math.abs(v) >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : Math.abs(v) >= 1e3 ? (v / 1e3).toFixed(0) + 'K' : v.toFixed(0)).replace(/^-/, '−').replace(/^(−?)/, '$1US$'),
   pct: (v, d = 1) => v === null || v === undefined || isNaN(v) ? '–' : (v * 100).toFixed(d).replace(/^-/, '−') + '%',
-  pts: v => v === null || v === undefined || isNaN(v) ? '–' : (v > 0 ? '+' : '') + (v * 100).toFixed(1).replace(/^-/, '−') + ' pts',
+  pts: v => v === null || v === undefined || isNaN(v) ? '–' : (Math.abs(v) < 0.00005 ? '0.0' : (v > 0 ? '+' : '') + (v * 100).toFixed(1).replace(/^-/, '−')) + ' pts',
   number: v => v === null || v === undefined || isNaN(v) ? '–' : Number(v).toLocaleString('en-US', { maximumFractionDigits: 0 }),
   number1: v => v === null || v === undefined || isNaN(v) ? '–' : Number(v).toLocaleString('en-US', { maximumFractionDigits: 1 }),
   days: v => v === null || v === undefined || isNaN(v) ? '–' : Math.round(v) + ' d', months: v => v === null || v === undefined ? '–' : Math.round(v) + ' mo', hours: v => v === null || v === undefined ? '–' : Number(v).toFixed(1) + ' h', ratio: v => v === null || v === undefined ? '–' : Number(v).toFixed(1) + 'x', score: v => v === null || v === undefined ? '–' : Number(v).toFixed(1)

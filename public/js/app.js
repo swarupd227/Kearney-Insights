@@ -51,7 +51,7 @@ async function show(screen, params) {
   const mod = SCREENS[screen] || SCREENS.home; state.screen = screen in SCREENS ? screen : 'home';
   document.querySelectorAll('.rail-link').forEach(a => a.classList.toggle('active', a.dataset.screen === state.screen));
   main.replaceChildren(h('div', { class: 'loading' }, 'Loading…'));
-  try { await mod.render(main, params); } catch (e) { console.error(e); main.replaceChildren(h('div', { class: 'card' }, h('h3', {}, 'This screen could not load'), h('div', { class: 'muted' }, e.message))); }
+  try { await mod.render(main, params); [...main.querySelectorAll('.hint')].slice(1).forEach(x => x.remove()); } catch (e) { console.error(e); main.replaceChildren(h('div', { class: 'card' }, h('h3', {}, 'This screen could not load'), h('div', { class: 'muted' }, e.message))); }
   main.scrollTop = 0;
   if (state.screen === 'home' && !briefSpokenFor.has(state.persona.id) && window.__astraBrief) { briefSpokenFor.add(state.persona.id); setTimeout(() => voice.speak(window.__astraBrief), 600); }
 }

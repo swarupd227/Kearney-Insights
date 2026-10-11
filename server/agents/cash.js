@@ -19,7 +19,7 @@ async function lateInvoices({ cut = {}, limit = 15 }) {
   const byClient = {}; list.forEach(r => { byClient[r.client_name] = (byClient[r.client_name] || 0) + r.amount * r.late_prob; });
   return { agent: 'Forecast Agent', model: { id: 6, name: 'Late payment', version: '1.0-seed' }, invoices: list, totals: t, narrative, spoken: `${money(t.expected_late)} of open invoices is likely to go past 90 days. ${list[0] ? list[0].client_name + ' is the client to call first.' : ''}`,
     visual: { type: 'bar', title: 'Expected late value by client', subtitle: 'Amount × probability of passing 90 days', x: Object.keys(byClient).slice(0, 10), series: [{ name: 'Expected late value', data: Object.values(byClient).slice(0, 10) }], format: 'money', horizontal: true, seeded: true, lineage: lineage(cut) },
-    table: composer.table('Invoices ranked by late-payment probability', '', [['id', 'Invoice'], ['client_name', 'Client'], ['unit_name', 'Unit'], ['amount', 'Amount', 'money'], ['due_date', 'Due'], ['days_past_due', 'Days past due'], ['late_prob', 'P(>90 days)', 'pct'], ['drivers', 'Drivers']], list, lineage(cut)),
+    table: composer.table('Invoices ranked by late-payment probability', '', [['id', 'Invoice'], ['client_name', 'Client'], ['unit_name', 'Unit'], ['amount', 'Amount', 'money'], ['due_date', 'Due'], ['days_past_due', 'Days past due'], ['late_prob', 'Chance past 90 days', 'pct'], ['drivers', 'Drivers']], list, lineage(cut)),
     followUps: ['How much WIP is held up by missing timesheets?', 'Show lock-up days by unit', 'What should I do about it?'] };
 }
 async function wipHeldByTimesheets({ cut = {} }) {

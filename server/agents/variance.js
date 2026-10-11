@@ -159,7 +159,8 @@ async function profitPerPartner(cut, pA, pB) {
   const steps = [{ label: pA.label, value: v(pa), kind: 'start' }];
   const drivers = Object.entries(parts).map(([k, x]) => ({ driver: k, effect: gap * x / sumParts })); drivers.forEach(d => steps.push({ label: d.driver, value: d.effect, kind: 'delta' }));
   steps.push({ label: pB.label, value: v(pb), kind: 'end' });
-  const narrative = `Profit per partner${composer.scopeIn(cut)} moved from ${money(v(pa))} to ${money(v(pb))} (${pct(v(pb) / v(pa) - 1)}). Margin went from ${pct(v(ma))} to ${pct(v(mb))}, revenue per professional from ${money(v(ra))} to ${money(v(rb))} and leverage from ${v(la).toFixed(1)} to ${v(lb).toFixed(1)}. ${drivers.sort((x, y) => Math.abs(y.effect) - Math.abs(x.effect))[0].driver} moved profit per partner most.`;
+  const moved = (label, a, b) => a === b ? `${label} stayed at ${a}` : `${label} went from ${a} to ${b}`;
+  const narrative = `Profit per partner${composer.scopeIn(cut)} moved from ${money(v(pa))} to ${money(v(pb))} (${pct(v(pb) / v(pa) - 1)}). ${moved('Margin', pct(v(ma)), pct(v(mb)))}, ${moved('revenue per professional', money(v(ra)), money(v(rb)))} and ${moved('leverage', v(la).toFixed(1), v(lb).toFixed(1))}. ${drivers.sort((x, y) => Math.abs(y.effect) - Math.abs(x.effect))[0].driver} moved profit per partner most.`;
   return { agent: 'Variance Agent', metric: 'profit_per_partner', drivers, narrative, spoken: narrative, tree: { ppp: [v(pa), v(pb)], margin: [v(ma), v(mb)], rpp: [v(ra), v(rb)], leverage: [v(la), v(lb)] },
     visual: composer.waterfall('Profit per partner driver tree', `${pA.label} to ${pB.label}`, steps, 'money', pb.lineage), followUps: ['What would a 3% rate increase in North America do to profit per partner?', 'Show margin by region', 'Show leverage by unit'] };
 }

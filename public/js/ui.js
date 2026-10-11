@@ -96,6 +96,13 @@ export function openLineage(l, extra = {}) {
   drawer.classList.add('open');
 }
 
+// Dates and codes as people read them: "5 Nov 2026", "Fixed fee", "Live".
+const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+export function dateShort(v) { const s = String(v); const d = new Date(s.length === 10 ? s + 'T00:00:00Z' : s); if (isNaN(d)) return s; return `${d.getUTCDate()} ${MONTHS_SHORT[d.getUTCMonth()]} ${d.getUTCFullYear()}`; }
+export function monthShort(m) { const d = new Date(String(m).slice(0, 10) + 'T00:00:00Z'); return isNaN(d) ? String(m) : MONTHS_SHORT[d.getUTCMonth()] + ' ' + d.getUTCFullYear(); }
+export function dateTimeShort(v) { const d = new Date(v); if (isNaN(d)) return String(v); return `${dateShort(d.toISOString())} ${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`; }
+const WORDS = { tm: 'Time and materials', fixed: 'Fixed fee', value: 'Value-based', retainer: 'Retainer', live: 'Live', closed: 'Closed', open: 'Open', filled: 'Filled', pending: 'Pending', approved: 'Approved', rejected: 'Rejected', won: 'Won', lost: 'Lost' };
+const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
 export function renderTable(t, opts = {}) {
   if (!t) return null;
   const cols = t.columns;
@@ -112,7 +119,8 @@ function cell(v, format, key, row) {
   if (format === 'pts') return h('td', { class: 'num ' + (v < 0 ? 'bad' : 'good') }, FMT.pts(v));
   if (format) { const cls = (key === 'gap' || key === 'change' || key === 'contribution') ? (v < 0 ? 'bad' : 'good') : ''; return h('td', { class: 'num ' + cls }, fmtValue(v, format)); }
   if (typeof v === 'number') return h('td', { class: 'num' }, Number.isInteger(v) ? v.toLocaleString() : v.toFixed(2));
-  if (/^\d{4}-\d{2}-\d{2}/.test(String(v))) return h('td', {}, String(v).slice(0, 10));
+  if (/^\d{4}-\d{2}-\d{2}/.test(String(v))) return h('td', { class: 'nowrap' }, dateShort(v));
+  if (key === 'fee_model' || key === 'status' || key === 'stage') return h('td', {}, WORDS[String(v).toLowerCase()] || cap(String(v)));
   return h('td', {}, String(v));
 }
 
