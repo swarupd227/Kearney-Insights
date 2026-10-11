@@ -82,7 +82,7 @@ function parseIntent(q, parsed) {
   if (/what (did|have) the agents (do|done)|agent observatory|observatory|what can the action agent|agent polic|which agents|what the agents/.test(t)) return 'observatory';
   if (/service desk|ticket volumes|tickets by|incidents|help ?desk|applications do fewer|licensed users|adoption/.test(t)) return 'it_service';
   if (/how (was|is) this calculated|lineage|show (me )?the (calculation|lineage|source)|where does this number come from|trace/.test(t)) return 'lineage';
-  if (/pin this|pin to my board|make this weekly|share this|turn this into a slide|export (this|to) (a )?slide|slide export/.test(t)) return 'board';
+  if (/pin this|pin to my board|make this weekly|share this|turn this into a slide|export (this|to) (a )?slide|slide export|animate (this|it|that)|make (this|it) an animation|turn this into (an animation|a video)/.test(t)) return 'board';
   if (/find me|material on|kearney material|documents? on|search for|knowledge on|who knows about|experts? on|look for/.test(t)) return 'knowledge';
   if (/prepare me|prepare for|brief me|meeting (with|tomorrow)|account (360|plan|brief)|audio brief|for the car|what have we done for|who in the firm (has worked|knows)|relationship map|white space|whitespace|where is the white/.test(t)) return 'client360';
   if (/who can start|who is available|who could start|available (on|from)|rolling off|roll.?off|bench list|open roles|staffing gap|who can i put|candidates for/.test(t)) return 'match';
