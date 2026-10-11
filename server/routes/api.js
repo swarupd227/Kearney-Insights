@@ -29,11 +29,12 @@ router.get('/meta', wrap(async (req, res) => {
 }));
 
 // Settings: language-model connection and UI preferences (stored in app_settings; the API key is never echoed back)
-router.get('/settings', wrap(async (req, res) => { const s = (await settingsStore.get('llm', null)) || {}; const ui = await settingsStore.get('ui', {}); res.json({ llm: { provider: s.provider || 'none', endpoint: s.endpoint || '', model: s.model || '', apiVersion: s.apiVersion || '2024-10-21', planner: s.planner !== false, hasKey: Boolean(s.apiKey), keyMasked: s.apiKey ? s.apiKey.slice(0, 4) + '…' + s.apiKey.slice(-4) : null, defaults: llm.DEFAULT_MODELS }, status: await llm.status(), ui: { provenance: ui.provenance === true } }); }));
+router.get('/settings', wrap(async (req, res) => { const s = (await settingsStore.get('llm', null)) || {}; const ui = await settingsStore.get('ui', {}); const sp = (await settingsStore.get('speech', null)) || {}; const spEnv = config.azureSpeechEnabled; res.json({ speech: { enabled: sp.enabled !== false, region: sp.region || (spEnv ? config.azureSpeech.region : ''), voice: sp.voice || 'en-GB-SoniaNeural', hasKey: Boolean(sp.key || spEnv), keyMasked: sp.key ? sp.key.slice(0, 4) + '…' + sp.key.slice(-4) : (spEnv ? 'from environment' : null), source: sp.key ? 'settings' : (spEnv ? 'environment' : 'none') }, llm: { provider: s.provider || 'none', endpoint: s.endpoint || '', model: s.model || '', apiVersion: s.apiVersion || '2024-10-21', planner: s.planner !== false, hasKey: Boolean(s.apiKey), keyMasked: s.apiKey ? s.apiKey.slice(0, 4) + '…' + s.apiKey.slice(-4) : null, defaults: llm.DEFAULT_MODELS }, status: await llm.status(), ui: { provenance: ui.provenance === true } }); }));
 router.post('/settings', wrap(async (req, res) => {
   const persona = personaOf(req); const b = req.body || {};
   if (b.llm) { const prev = (await settingsStore.get('llm', null)) || {}; const next = { provider: b.llm.provider || 'none', endpoint: (b.llm.endpoint || '').trim(), model: (b.llm.model || '').trim(), apiVersion: (b.llm.apiVersion || '2024-10-21').trim(), apiKey: b.llm.apiKey ? String(b.llm.apiKey).trim() : (b.llm.clearKey ? '' : prev.apiKey || ''), planner: b.llm.planner === undefined ? (prev.planner !== false) : Boolean(b.llm.planner) }; await settingsStore.set('llm', next, persona.title); await db.query('INSERT INTO audit_log (persona, event, detail) VALUES ($1,$2,$3)', [persona.id, 'settings_llm', JSON.stringify({ provider: next.provider, model: next.model, endpoint: next.endpoint, keyChanged: Boolean(b.llm.apiKey || b.llm.clearKey) })]); }
   if (b.ui) { const ui = await settingsStore.get('ui', {}); await settingsStore.set('ui', { ...ui, ...b.ui }, persona.title); }
+  if (b.speech) { const prev = (await settingsStore.get('speech', null)) || {}; const next = { enabled: b.speech.enabled !== false, region: (b.speech.region || '').trim(), voice: (b.speech.voice || 'en-GB-SoniaNeural').trim(), key: b.speech.key ? String(b.speech.key).trim() : (b.speech.clearKey ? '' : prev.key || '') }; await settingsStore.set('speech', next, persona.title); await db.query('INSERT INTO audit_log (persona, event, detail) VALUES ($1,$2,$3)', [persona.id, 'settings_speech', JSON.stringify({ region: next.region, voice: next.voice, enabled: next.enabled, keyChanged: Boolean(b.speech.key || b.speech.clearKey) })]); }
   llm.clearError();
   res.json({ ok: true, status: await llm.status() });
 }));
@@ -113,12 +114,14 @@ router.delete('/boards/:id', wrap(async (req, res) => { await db.query('DELETE F
 router.get('/audit', wrap(async (req, res) => res.json(await db.query('SELECT * FROM audit_log ORDER BY ts DESC LIMIT 50'))));
 
 // Speech: Azure AI Speech token when configured (browser speech is the fallback)
+async function speechConfig() { const s = await settingsStore.get('speech', null); if (s && s.enabled !== false && s.key && s.region) return { key: s.key, region: s.region, voice: s.voice || 'en-GB-SoniaNeural', source: 'settings' }; if (config.azureSpeechEnabled) return { key: config.azureSpeech.key, region: config.azureSpeech.region, voice: 'en-GB-SoniaNeural', source: 'environment' }; return null; }
 router.get('/speech/token', wrap(async (req, res) => {
-  if (!config.azureSpeechEnabled) return res.json({ provider: 'browser' });
-  const r = await fetch(`https://${config.azureSpeech.region}.api.cognitive.microsoft.com/sts/v1.0/issueToken`, { method: 'POST', headers: { 'Ocp-Apim-Subscription-Key': config.azureSpeech.key, 'Content-Length': '0' } });
-  if (!r.ok) return res.json({ provider: 'browser', error: 'token request failed' });
-  res.json({ provider: 'azure', token: await r.text(), region: config.azureSpeech.region });
+  const sc = await speechConfig(); if (!sc) return res.json({ provider: 'browser' });
+  const r = await fetch(`https://${sc.region}.api.cognitive.microsoft.com/sts/v1.0/issueToken`, { method: 'POST', headers: { 'Ocp-Apim-Subscription-Key': sc.key, 'Content-Length': '0' } }).catch(() => null);
+  if (!r || !r.ok) return res.json({ provider: 'browser', error: r ? `token request failed (${r.status})` : 'speech endpoint unreachable' });
+  res.json({ provider: 'azure', token: await r.text(), region: sc.region, voice: sc.voice, expiresIn: 540 });
 }));
+router.post('/speech/test', wrap(async (req, res) => { const b = req.body || {}; const key = b.key || (await speechConfig() || {}).key; const region = b.region || (await speechConfig() || {}).region; if (!key || !region) return res.json({ ok: false, error: 'Region and key are required' }); const t0 = Date.now(); const r = await fetch(`https://${region}.api.cognitive.microsoft.com/sts/v1.0/issueToken`, { method: 'POST', headers: { 'Ocp-Apim-Subscription-Key': key, 'Content-Length': '0' } }).catch(e => ({ ok: false, status: 0, text: async () => e.message })); res.json(r.ok ? { ok: true, region, ms: Date.now() - t0 } : { ok: false, error: r.status === 401 ? 'Authentication failed: check the key and region' : `Token request failed (${r.status || 'network'})` }); }));
 
 router.use('/screens', screens);
 router.use('/export', require('./export'));

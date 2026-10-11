@@ -127,8 +127,12 @@ function setupVoice() {
     onState: s => { orb.className = 'orb ' + s; st.textContent = { idle: voice.wake ? 'Say “Astra”' : 'Tap to talk', listening: 'Listening…', thinking: 'Thinking…', speaking: 'Speaking… (Esc to stop)' }[s] || s; },
     onTranscript: t => { tr.textContent = t ? '“' + t + '”' : ''; },
     onFinal: (text, err) => { if (err) { toast(err); tr.textContent = ''; return; } tr.textContent = '“' + text + '”'; ask(text); setTimeout(() => { tr.textContent = ''; }, 4000); },
-    onWake: () => toast('Listening…')
+    onWake: () => toast('Listening…'),
+    onEngine: engine => { st.title = engine === 'azure' ? 'Azure AI Speech (in-tenant)' : 'Browser speech engine'; if (engine !== 'azure' && !voice.supported) st.textContent = 'Voice needs Edge or Chrome'; else if (!voice.wake) st.textContent = 'Tap to talk'; }
   });
+  // Firm vocabulary for the recogniser's phrase list: metric names, regions, units, offices, practices, industries, public clients, prompts
+  voice.setPhrases([...state.meta.metrics.map(m => m.name), ...state.ref.regions.map(r => r.name), ...state.ref.units.map(u => u.name), ...state.ref.offices.map(o => o.city), ...state.ref.practices.map(p => p.name), ...state.ref.industries.map(i => i.name), ...state.ref.clients.map(c => c.name), 'LIC', 'DACH', 'Astra', 'realisation', 'utilisation', 'lock-up days', 'Principals', 'Associates', ...state.persona.questions]);
+  document.addEventListener('astra:settings-changed', () => voice.refreshToken());
   if (!voice.supported) { st.textContent = 'Voice needs Edge or Chrome'; }
   orb.addEventListener('click', () => voice.listen());
   document.getElementById('wakeToggle').addEventListener('change', e => { voice.setWake(e.target.checked); st.textContent = e.target.checked ? 'Say “Astra”' : 'Tap to talk'; });

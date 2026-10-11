@@ -97,6 +97,17 @@ The fourteen analytical agents (variance, forecast, win probability, engagement 
 and the rest) are statistical models on the firm's data by design: the specification requires every number to come from the
 Query Agent, with language models used through prompts only.
 
+### Voice: Azure AI Speech or the browser engine
+
+Settings → **Voice**: enter the Azure AI Speech region and key (or deploy with `WITH_AI=true`, which creates the resource
+and sets `AZURE_SPEECH_KEY` / `AZURE_SPEECH_REGION`). The server issues short-lived tokens to the browser; the key never
+leaves the server. With Azure configured, recognition uses a phrase list of the firm's vocabulary (metric names, units,
+offices, practices, industries, public clients and the persona prompts), synthesis uses a neural voice (default
+`en-GB-SoniaNeural`, selectable), both work in every browser, and audio stays in the tenant. Without it, the browser's own
+engine is used (Edge and Chrome). "Hear the voice" in Settings plays a sample; push-to-talk, the wake word "Astra",
+interruption and quiet mode behave the same with either engine. The SDK is vendored at `public/vendor/speech-sdk.min.js`
+so the product works without internet access to a CDN.
+
 ### Theme and provenance badges
 
 The ☀/☾ button in the top bar switches between dark and light; the choice is remembered per browser and the charts re-theme.
