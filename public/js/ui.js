@@ -51,6 +51,13 @@ export async function animateAnswer(a) {
   body.replaceChildren(h('p', { class: 'small' }, copied ? 'The prompt is on your clipboard. In Claude, paste it into the message box (it starts with /motion) and Claude Motion builds the animation; download it as MP4 or open it in your video tool.' : 'Copy the prompt below, then paste it into Claude’s message box (it starts with /motion).'), h('textarea', { readonly: true, style: { width: '100%', height: '320px', background: 'var(--surface-2)', color: 'var(--text)', border: '1px solid var(--border-2)', borderRadius: '9px', padding: '10px', fontSize: '12px', fontFamily: 'var(--mono)' } }, text), h('div', { class: 'card-foot' }, h('button', { class: 'btn small', onClick: async () => { try { await navigator.clipboard.writeText(text); toast('Copied'); } catch (e) { toast('Select the text and copy it'); } } }, 'Copy again'), h('span', { class: 'muted small' }, 'Motion is a beta on Team and Enterprise plans; an admin enables it under Organization settings → Artifacts.')));
   drawer.classList.add('open'); toast(copied ? 'Motion prompt copied' : 'Motion prompt ready');
 }
+// Count a numeral up from zero to its value over about a second (used for headline tiles).
+export function countUp(el, value, format, ms = 1000) {
+  if (value === null || value === undefined || isNaN(value)) return el;
+  const t0 = performance.now(); const ease = x => 1 - Math.pow(1 - x, 3);
+  const tick = () => { const p = Math.min(1, (performance.now() - t0) / ms); el.textContent = fmtValue(value * ease(p), format); if (p < 1) setTimeout(tick, 24); else el.textContent = fmtValue(value, format); };
+  setTimeout(tick, 60); return el;
+}
 export function toast(msg, ms = 2600) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), ms); }
 export function ask(question, context = null) { document.dispatchEvent(new CustomEvent('astra:ask', { detail: { question, context } })); }
 export function navigate(screen, params = {}) { document.dispatchEvent(new CustomEvent('astra:navigate', { detail: { screen, params } })); }
@@ -115,7 +122,7 @@ export function renderVisual(spec, { onPoint, compact = false, titleOverride } =
   if (spec.type === 'kpi') {
     const good = spec.delta == null ? null : spec.delta >= 0;
     return h('div', { class: 'card' }, h('h3', {}, titleOverride || spec.title || ''), spec.subtitle ? h('div', { class: 'sub' }, spec.subtitle) : null,
-      h('div', { class: 'value', style: { fontSize: '40px', fontWeight: 600, letterSpacing: '-.02em', margin: '6px 0 2px' } }, spec.value == null ? '–' : fmtValue(spec.value, spec.format)),
+      countUp(h('div', { class: 'value', style: { fontSize: '40px', fontWeight: 600, letterSpacing: '-.02em', margin: '6px 0 2px' } }, spec.value == null ? '–' : fmtValue(spec.value, spec.format)), spec.value, spec.format),
       spec.delta != null ? h('div', { class: 'small ' + (good ? 'good' : 'bad') }, (spec.format === 'pct' ? FMT.pts(spec.delta) : (spec.delta >= 0 ? '+' : '') + fmtValue(spec.delta, spec.format)) + (spec.deltaLabel ? ' ' + spec.deltaLabel : '')) : null,
       h('div', { class: 'card-foot' }, spec.badge ? seededBadge(false, spec.badge) : seededBadge(spec.seeded !== false), spec.lineage ? lineageButton(spec.lineage) : null));
   }
@@ -157,7 +164,7 @@ export function kpiTile(tile, onClick) {
   const deltaText = tile.delta == null ? (tile.compare ? '' : '') : (tile.deltaKind === 'pts' ? FMT.pts(tile.delta) : (tile.delta >= 0 ? '+' : '') + (tile.delta * 100).toFixed(1) + '%') + (tile.compare ? ' vs ' + tile.compare.label : '');
   const el = h('div', { class: 'tile', onClick, title: 'Open on the canvas' },
     h('div', { class: 'name' }, h('span', {}, h('span', { class: 'status', style: { background: statusColor } }), tile.name), seededBadge(true)),
-    h('div', { class: 'value' }, tile.value == null ? '–' : fmtValue(tile.value, tile.format)),
+    countUp(h('div', { class: 'value' }, tile.value == null ? '–' : fmtValue(tile.value, tile.format)), tile.value, tile.format),
     h('div', { class: 'delta ' + (good === null ? 'muted' : good ? 'good' : 'bad') }, deltaText || tile.period || ''),
     h('div', { class: 'spark' }));
   if (tile.spark && tile.spark.length > 2) setTimeout(() =>renderChart(el.querySelector('.spark'), { type: 'spark', data: tile.spark, color: good === false ? 'bad' : 'accent' }));

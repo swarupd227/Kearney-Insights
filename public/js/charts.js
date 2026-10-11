@@ -20,7 +20,8 @@ export const fmt = {
 };
 export function f(v, format) { return (fmt[format] || fmt.number)(v); }
 function axisFmt(format) { return v => format === 'money' ? fmt.money(v) : format === 'pct' ? (v * 100).toFixed(0) + '%' : fmt.number(v); }
-const base = () => ({ backgroundColor: 'transparent', textStyle: { color: T.text, fontFamily: 'inherit' }, animationDuration: 500, grid: { left: 8, right: 16, top: 30, bottom: 8, containLabel: true }, tooltip: { backgroundColor: T.tooltip, borderColor: T.border, textStyle: { color: T.text, fontSize: 12 } }, legend: { textStyle: { color: T.muted, fontSize: 11 }, top: 0, right: 0, icon: 'circle', itemWidth: 8, itemHeight: 8 } });
+// Every answer builds in front of the viewer: lines draw left to right, bars rise in sequence, waterfall steps drop in one by one, numbers count up.
+const base = () => ({ backgroundColor: 'transparent', textStyle: { color: T.text, fontFamily: 'inherit' }, animationDuration: 1100, animationEasing: 'cubicOut', animationDurationUpdate: 400, grid: { left: 8, right: 16, top: 30, bottom: 8, containLabel: true }, tooltip: { backgroundColor: T.tooltip, borderColor: T.border, textStyle: { color: T.text, fontSize: 12 } }, legend: { textStyle: { color: T.muted, fontSize: 11 }, top: 0, right: 0, icon: 'circle', itemWidth: 8, itemHeight: 8 } });
 const axisStyleOf = () => ({ axisLine: { lineStyle: { color: T.border } }, axisTick: { show: false }, axisLabel: { color: T.muted, fontSize: 11 }, splitLine: { lineStyle: { color: T.split } } });
 
 const instances = new WeakMap();
@@ -65,12 +66,12 @@ function lineOpt(s) {
   if (s.target) series.push({ name: 'Target', type: 'line', data: s.x.map(() => s.target), symbol: 'none', lineStyle: { type: 'dotted', color: T.good, width: 1.5 } });
   o.xAxis = { type: 'category', data: s.x, ...axisStyleOf(), boundaryGap: false }; o.yAxis = [{ type: 'value', ...axisStyleOf(), axisLabel: { ...axisStyleOf().axisLabel, formatter: axisFmt(s.format) }, scale: true }];
   if (s.series.some(se => se.kind === 'secondary')) o.yAxis.push({ type: 'value', ...axisStyleOf(), splitLine: { show: false }, axisLabel: { ...axisStyleOf().axisLabel, formatter: axisFmt(s.series.find(se => se.kind === 'secondary').format || 'number') } });
-  o.series = series; o.tooltip.trigger = 'axis'; o.tooltip.valueFormatter = v => f(v, s.format); return o;
+  o.series = series; o.animationDuration = 1600; o.tooltip.trigger = 'axis'; o.tooltip.valueFormatter = v => f(v, s.format); return o;
 }
 function barOpt(s) {
   const o = base(); const horizontal = s.horizontal; const main = s.series[0];
   const colors = main.data.map(v => s.target != null ? (v >= s.target ? T.accent : T.bad) : (v < 0 ? T.bad : T.accent));
-  const series = [{ name: main.name, type: 'bar', data: main.data.map((v, i) => ({ value: v, itemStyle: { color: colors[i], borderRadius: 4 } })), barMaxWidth: 26, label: { show: s.x.length <= 12, position: horizontal ? 'right' : 'top', color: T.muted, fontSize: 10.5, formatter: p => f(p.value, s.format) } }];
+  const series = [{ name: main.name, type: 'bar', data: main.data.map((v, i) => ({ value: v, itemStyle: { color: colors[i], borderRadius: 4 } })), barMaxWidth: 26, animationDelay: idx => idx * 90, animationDuration: 700, label: { show: s.x.length <= 12, position: horizontal ? 'right' : 'top', color: T.muted, fontSize: 10.5, formatter: p => f(p.value, s.format) } }];
   s.series.slice(1).forEach(se => series.push({ name: se.name, type: se.kind === 'secondary' ? 'line' : 'bar', data: se.data, barMaxWidth: 26, itemStyle: { color: se.kind === 'compare' ? 'rgba(255,180,84,.55)' : T.info, borderRadius: 4 }, symbol: 'circle', ...(se.kind === 'secondary' ? (horizontal ? { xAxisIndex: 1 } : { yAxisIndex: 1 }) : {}) }));
   if (s.target != null) series.push({ name: 'Target', type: horizontal ? 'bar' : 'line', data: horizontal ? [] : s.x.map(() => s.target), symbol: 'none', lineStyle: { type: 'dotted', color: T.good }, markLine: horizontal ? { silent: true, symbol: 'none', lineStyle: { type: 'dotted', color: T.good }, data: [{ xAxis: s.target }] } : undefined });
   const cat = { type: 'category', data: s.x, ...axisStyleOf(), axisLabel: { ...axisStyleOf().axisLabel, interval: 0, width: horizontal ? 150 : 90, overflow: 'truncate', rotate: horizontal ? 0 : (s.x.length > 6 ? 25 : 0) }, inverse: horizontal };
@@ -94,7 +95,7 @@ function waterfall(s) {
   if (many) o.grid.bottom = 36;
   o.yAxis = { type: 'value', ...axisStyleOf(), min: minBase || undefined, axisLabel: { ...axisStyleOf().axisLabel, formatter: axisFmt(s.format) } };
   if (minBase && !pct) o.title = { text: 'axis starts at ' + f(minBase, s.format), right: 0, top: 0, textStyle: { color: T.faint, fontSize: 10, fontWeight: 'normal' } };
-  o.series = [{ type: 'bar', stack: 'w', data: inv, itemStyle: { color: 'transparent' }, silent: true, barMaxWidth: 46 }, { type: 'bar', stack: 'w', data: vis, barMaxWidth: 46, labelLayout: { hideOverlap: true }, label: { show: true, position: 'top', color: T.muted, fontSize: 10.5, formatter: p => { const st = steps[p.dataIndex]; return st.kind === 'delta' ? (pct ? fmt.pts(st.value) : (st.value >= 0 ? '+' : '') + fmt.money(st.value)) : f(st.value, s.format); } } }];
+  o.series = [{ type: 'bar', stack: 'w', data: inv, itemStyle: { color: 'transparent' }, silent: true, barMaxWidth: 46 }, { type: 'bar', stack: 'w', data: vis, barMaxWidth: 46, labelLayout: { hideOverlap: true }, animationDelay: idx => idx * 260, animationDuration: 600, label: { show: true, position: 'top', color: T.muted, fontSize: 10.5, formatter: p => { const st = steps[p.dataIndex]; return st.kind === 'delta' ? (pct ? fmt.pts(st.value) : (st.value >= 0 ? '+' : '') + fmt.money(st.value)) : f(st.value, s.format); } } }];
   o.tooltip.formatter = p => { const st = steps[p.dataIndex]; return `${st.label}: ${st.kind === 'delta' ? (pct ? fmt.pts(st.value) : fmt.money(st.value)) : f(st.value, s.format)}`; };
   o.grid.top = 28; return o;
 }
@@ -104,9 +105,10 @@ function forecastOpt(s) {
   o.series = [
     { name: 'P10–P90', type: 'line', data: bandLow, stack: 'b', lineStyle: { opacity: 0 }, symbol: 'none', silent: true, areaStyle: { opacity: 0 } },
     { name: 'P10–P90', type: 'line', data: bandW, stack: 'b', lineStyle: { opacity: 0 }, symbol: 'none', silent: true, areaStyle: { color: T.accent, opacity: .18 } },
-    { name: 'Actual', type: 'line', data: s.actual, smooth: .2, symbol: 'circle', symbolSize: 4, lineStyle: { color: T.accent2, width: 2.5 }, itemStyle: { color: T.accent2 } },
-    { name: 'Forecast (P50)', type: 'line', data: s.p50, smooth: .2, symbol: 'circle', symbolSize: 4, lineStyle: { color: T.accent, width: 2.5, type: 'dashed' }, itemStyle: { color: T.accent } }
+    { name: 'Actual', type: 'line', data: s.actual, smooth: .2, symbol: 'circle', symbolSize: 4, lineStyle: { color: T.accent2, width: 2.5 }, itemStyle: { color: T.accent2 }, animationDuration: 1500 },
+    { name: 'Forecast (P50)', type: 'line', data: s.p50, smooth: .2, symbol: 'circle', symbolSize: 4, lineStyle: { color: T.accent, width: 2.5, type: 'dashed' }, itemStyle: { color: T.accent }, animationDelay: 1400, animationDuration: 900 }
   ];
+  o.series[0].animationDelay = 1400; o.series[1].animationDelay = 1400;
   if (s.plan) o.series.push({ name: 'Plan', type: 'line', data: s.plan, symbol: 'none', lineStyle: { color: T.warn, width: 1.5, type: 'dotted' }, itemStyle: { color: T.warn } });
   o.series[2].markLine = { silent: true, symbol: 'none', lineStyle: { color: T.faint, type: 'dashed' }, label: { color: T.muted, formatter: 'today' }, data: [{ xAxis: s.splitIndex - 0.5 }] };
   o.xAxis = { type: 'category', data: s.x, ...axisStyleOf(), boundaryGap: false, axisLabel: { ...axisStyleOf().axisLabel, interval: Math.ceil(s.x.length / 12) - 1 } }; o.yAxis = { type: 'value', ...axisStyleOf(), scale: true, axisLabel: { ...axisStyleOf().axisLabel, formatter: axisFmt(s.format) } };
@@ -119,7 +121,7 @@ function heatmapOpt(s) {
   o.grid = { left: 8, right: 70, top: 10, bottom: 8, containLabel: true };
   o.xAxis = { type: 'category', data: s.x, ...axisStyleOf(), splitArea: { show: false }, axisLabel: { ...axisStyleOf().axisLabel, interval: 0, rotate: s.x.length > 8 ? 35 : 0, fontSize: 10.5 } }; o.yAxis = { type: 'category', data: s.y, ...axisStyleOf(), inverse: true };
   o.visualMap = { min, max, calculable: false, orient: 'vertical', right: 0, top: 'middle', inRange: { color: s.invert ? [T.bad, T.heatMid, T.good] : [T.heatLow, T.accent, T.bad] }, textStyle: { color: T.muted, fontSize: 10 }, formatter: v => f(v, s.format), itemWidth: 10 };
-  o.series = [{ type: 'heatmap', data: s.cells.map(c => [c.x, c.y, c.value]), label: { show: true, color: '#fff', fontSize: 10.5, formatter: p => s.format === 'pct' ? (p.value[2] * 100).toFixed(0) + '%' : f(p.value[2], s.format) }, itemStyle: { borderColor: T.surface, borderWidth: 2, borderRadius: 4 }, emphasis: { itemStyle: { borderColor: T.accent2 } } }];
+  o.series = [{ type: 'heatmap', data: s.cells.map(c => [c.x, c.y, c.value]), animationDelay: idx => idx * 25, animationDuration: 500, label: { show: true, color: '#fff', fontSize: 10.5, formatter: p => s.format === 'pct' ? (p.value[2] * 100).toFixed(0) + '%' : f(p.value[2], s.format) }, itemStyle: { borderColor: T.surface, borderWidth: 2, borderRadius: 4 }, emphasis: { itemStyle: { borderColor: T.accent2 } } }];
   o.tooltip.formatter = p => { const c = s.cells[p.dataIndex]; return `${s.x[c.x]} · ${s.y[c.y]}<br>${f(c.value, s.format)}${c.n ? ` · ${c.n} people` : ''}${c.expected ? ` · ${c.expected.toFixed(1)} expected exits` : ''}`; };
   return o;
 }
