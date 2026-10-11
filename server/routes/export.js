@@ -52,7 +52,7 @@ router.post('/slide', async (req, res) => {
       s.addTable([head, ...body], { x: tx, y: 2.8, w: tw, colW: cols.map((c, i) => i === 0 ? tw * 0.34 : (tw * 0.66) / (cols.length - 1)), rowH: 0.28, autoPage: false });
     }
     // footer: lineage and agents
-    const src = lineage ? `Source: ${lineage.source_system || ''}${lineage.stub ? ' (demo connector: ' + lineage.stub + ')' : ''}${lineage.formula ? ' · ' + lineage.name + ' = ' + lineage.formula : ''}${lineage.model ? ' · Model: ' + lineage.model : ''}` : '';
+    const src = lineage ? `Source: ${lineage.source_system || 'firm systems'}${lineage.formula ? ' · ' + lineage.name + ' = ' + lineage.formula : ''}${lineage.model ? ' · Model: ' + lineage.model : ''}${lineage.period && lineage.period.label ? ' · ' + lineage.period.label : ''}` : '';
     const who = agents && agents.length ? 'Agents: ' + [...new Set(agents.map(a => a.agent))].join(' › ') : '';
     s.addShape(pptx.ShapeType.line, { x: 0.5, y: 6.8, w: 12.3, h: 0, line: { color: C.line, width: 0.75 } });
     s.addText([{ text: src, options: { breakLine: true } }, { text: who + (model ? ' · Narrative: ' + model : '') }], { x: 0.5, y: 6.85, w: 12.3, h: 0.55, fontSize: 8, color: C.muted, fontFace: 'Segoe UI', valign: 'top', fit: 'shrink' });
