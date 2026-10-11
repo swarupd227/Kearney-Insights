@@ -9,7 +9,7 @@ const STORYLINES = [
   { id: 'B', title: 'The Regional Managing Director for Europe investigates a realisation decline', minutes: 3, persona: 'rmd_eur', steps: [
     { say: 'Why did realisation drop in DACH last quarter?', does: 'Splits the decline into write-offs, fixed-fee overruns and rate discounts and names the engagements', point: 'The answer explains why, at engagement level' },
     { say: 'Will it get worse?', does: 'Engagement Health forecast with predicted overrun dates', point: 'Prediction at engagement level' },
-    { say: 'What should I do about it?', does: 'Drafts a pricing review, a staffing change and a note to the engagement partners', point: 'An insight becomes an action' },
+    { say: 'What should I do about it?', does: 'Drafts a pricing review, a staffing change and a note to the engagement partners, each with its expected effect in US$', point: 'An insight becomes an action with a number on it' },
     { say: 'Approve the first action', does: 'Records the approval (nothing is sent in demo mode); the other drafts stay pending', point: 'A person approves every action' }] },
   { id: 'C', title: 'A Global Account Leader prepares for a meeting with Life Insurance Corporation of India', minutes: 3, persona: 'gal', steps: [
     { say: 'Prepare me for my meeting with LIC tomorrow', does: 'Builds the account 360: public work sourced, financials from the connectors', point: 'One sentence replaces an afternoon of gathering' },

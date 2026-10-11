@@ -49,8 +49,8 @@ async function morningBrief(persona, { shorter = false } = {}) {
   // 4. People signal for people leaders
   if (persona.id === 'cpo') { const h = await talent.heatmap({ level: 'PRINCIPAL' }); if (h.ranked[0]) parts.push(`${h.ranked[0].label} shows the highest Principal flight risk, about ${num(h.ranked[0].expected)} expected exits in six months.`); }
   // 5. Drafted actions
-  const pending = await db.one('SELECT COUNT(*)::int AS n FROM actions WHERE status=$1', ['pending']);
-  parts.push(pending.n === 0 ? 'No drafted actions are waiting for your review.' : `I have drafted ${countWord(pending.n, 'action', null, { cap: false })} for your review; ${pending.n === 1 ? 'it is' : 'they are'} waiting in the action centre.`);
+  const pending = await db.one(`SELECT COUNT(*)::int AS n, COALESCE(SUM((payload->>'impact')::numeric),0) AS total FROM actions WHERE status=$1`, ['pending']);
+  parts.push(pending.n === 0 ? 'No drafted actions are waiting for your review.' : `I have drafted ${countWord(pending.n, 'action', null, { cap: false })}${Number(pending.total) ? ' worth about ' + money(Number(pending.total)) : ''} for your review; ${pending.n === 1 ? 'it is' : 'they are'} waiting in the action centre.`);
   const greeting = 'Good morning.';
   const text = shorter ? `${greeting} ${parts[0]} ${parts[parts.length - 1]}` : `${greeting} ${parts.join(' ')}`;
   return { agent: 'Briefing Agent', text, parts, facts, duration_s: Math.round(text.split(' ').length / 2.6), template: '{Region} is {gap to plan} against plan for the quarter, mainly because {largest driver}. {Number} engagements are forecast to overrun next month. {Unit with highest utilisation gap} is {gap} against its utilisation target. I have drafted {number} actions for your review.' };

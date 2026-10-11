@@ -26,6 +26,8 @@ async function main() {
   app.use('/vendor', express.static(path.join(__dirname, '..', 'public', 'vendor'), { maxAge: '1d', etag: true }));
   app.use(express.static(path.join(__dirname, '..', 'public'), { maxAge: 0, etag: true, cacheControl: true, setHeaders: res => res.setHeader('Cache-Control', 'no-cache') }));
   app.get(/^\/(?!api).*/, (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'index.html')));
+  // The predictions draft their own actions on boot so the action centre is never empty.
+  require('./agents/action').refreshQueue().then(r => { if (r.length) console.log(`Decision queue: ${r.length} action${r.length === 1 ? '' : 's'} raised from the predictions`); }).catch(e => console.error('Decision queue:', e.message));
   app.listen(config.port, () => console.log(`Astra Insights for Kearney listening on :${config.port} (demo today ${config.demoToday}; Azure OpenAI ${config.llmEnabled ? 'on' : 'off'}; Azure Speech ${config.azureSpeechEnabled ? 'on' : 'off'})`));
 }
 main().catch(e => { console.error('Fatal:', e); process.exit(1); });

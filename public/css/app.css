@@ -204,6 +204,10 @@ table.data td.nowrap { white-space: nowrap; }
 .action .t { font-weight: 600; } .action .meta { font-size: 12.5px; color: var(--muted); margin: 4px 0; }
 .action .body { font-size: 13.5px; margin: 8px 0; white-space: pre-wrap; }
 .action .btns { display: flex; flex-direction: column; gap: 6px; }
+.action .row { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.action .impact { display: flex; align-items: baseline; gap: 10px; margin: 6px 0 2px; flex-wrap: wrap; }
+.action .impact .v { font-size: 20px; font-weight: 600; color: var(--good); font-variant-numeric: tabular-nums; }
+.action .impact .x { font-size: 12.5px; color: var(--muted); }
 .scenario-table td.delta { font-weight: 600; }
 .kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 13px; }
 .kv .k { color: var(--muted); }

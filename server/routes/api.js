@@ -64,9 +64,9 @@ router.get('/home/:persona', wrap(async (req, res) => {
   const brief = await briefing.morningBrief(persona);
   const feed = await trend.feed(persona, { limit: 5 });
   const cards = await needsYou(persona);
-  const pending = await db.query('SELECT * FROM actions WHERE status=$1 ORDER BY created_at DESC LIMIT 5', ['pending']);
+  const allPending = (await db.query('SELECT * FROM actions WHERE status=$1', ['pending'])).sort((a, b) => Number(b.payload && b.payload.impact || 0) - Number(a.payload && a.payload.impact || 0)); const pending = allPending.slice(0, 5); const pendingSummary = action.summary(allPending);
   const events = await db.query('SELECT * FROM calendar_events WHERE persona=$1 ORDER BY start_ts', [persona.id]);
-  res.json({ persona: slim(persona), tiles, brief, feed, cards, pending, events, seeded: config.demoMode });
+  res.json({ persona: slim(persona), tiles, brief, feed, cards, pending, pendingSummary: { n: pendingSummary.n, total: pendingSummary.total }, events, seeded: config.demoMode });
 }));
 async function needsYou(persona) {
   const cards = [];
@@ -101,7 +101,7 @@ router.get('/metric/:id', wrap(async (req, res) => { const cut = {}; for (const 
 router.get('/lineage/:id', wrap(async (req, res) => { const m = catalogue.byId[req.params.id]; if (!m) return res.status(404).json({ error: 'unknown metric' }); const r = await engine.compute(req.params.id, { period: req.query.period || 'ltm' }); res.json(r.lineage); }));
 
 // Actions (screen 14)
-router.get('/actions', wrap(async (req, res) => res.json(await action.list(personaOf(req)))));
+router.get('/actions', wrap(async (req, res) => { if (req.query.refresh) await action.refreshQueue().catch(e => console.error('queue refresh', e.message)); res.json(await action.list(personaOf(req))); }));
 router.post('/actions/:id/decide', wrap(async (req, res) => { const persona = personaOf(req); const row = await action.decide(parseInt(req.params.id, 10), req.body.decision, persona, req.body.edit); res.json(row); }));
 router.post('/actions/draft', wrap(async (req, res) => { const persona = personaOf(req); const memory = conductor.memoryFor(req.body.session || 'default'); res.json(await action.draftFromContext(persona, memory)); }));
 

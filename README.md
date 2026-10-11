@@ -177,7 +177,7 @@ infra/             deploy.sh, reseed.sh, destroy.sh (Azure CLI, Cloud Shell)
 Every question follows the eight steps in Section 6: parse and plan (Conductor) → resolve the governed metric (Metric Agent)
 → query under the persona's row-level security (Query Agent) → analytical agents → compose visual and narrative → Guardian
 (pass, redact or block, logged) → answer with "How was this calculated?", the agent timeline and three follow-ups.
-The Action Agent only drafts; approvals in the action centre go to a stub that records them and sends nothing.
+The Action Agent only drafts; approvals in the action centre go to a stub that records them and sends nothing. Every draft carries an expected effect computed from the data (realisation recovered, margin at risk, cash collected, weighted pipeline back in motion, replacement cost avoided) with the assumption stated. The action centre is a decision queue: on boot and each time it opens, the predictions raise their own drafts (engagements likely to overrun, the unit with the highest Principal flight risk, invoices likely to pass 90 days, stalled opportunities above US$1 million), ranked by expected effect and never raised twice while one is pending.
 
 ### Models
 
