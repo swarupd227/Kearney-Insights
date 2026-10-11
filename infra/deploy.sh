@@ -30,6 +30,7 @@ PG_PASSWORD=${PG_PASSWORD:-$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | cut 
 PG_DB=${PG_DB:-astra}
 CAE=${CAE:-cae-${PREFIX}-${SUFFIX}}
 APP=${APP:-ca-${PREFIX}-insights}
+CAE_LOCATION=${CAE_LOCATION:-$LOCATION}   # the Container Apps environment may live in another region than Postgres
 DEMO_TODAY=${DEMO_TODAY:-2026-10-13}
 WITH_AI=${WITH_AI:-false}
 AOAI=${AOAI:-aoai-${PREFIX}-${SUFFIX}}
@@ -48,6 +49,7 @@ PG_ADMIN=$PG_ADMIN
 PG_PASSWORD=$PG_PASSWORD
 PG_DB=$PG_DB
 CAE=$CAE
+CAE_LOCATION=$CAE_LOCATION
 APP=$APP
 AOAI=$AOAI
 SPEECH=$SPEECH
@@ -110,7 +112,7 @@ fi
 
 echo "==> Container Apps environment $CAE"
 if ! az containerapp env show -n "$CAE" -g "$RG" -o none 2>/dev/null; then
-  az containerapp env create -n "$CAE" -g "$RG" -l "$LOCATION" -o none
+  az containerapp env create -n "$CAE" -g "$RG" -l "$CAE_LOCATION" --logs-destination none -o none
 fi
 
 echo "==> Container app $APP"
