@@ -141,7 +141,7 @@ function setupVoice() {
 // ---------- asking ----------
 let busy = false;
 async function handleAsk(question, context) {
-  if (busy) { toast('One moment, the agents are still working on the last question.'); return; }
+  if (busy) { toast('One moment, the last question is still being answered.'); return; }
   busy = true; voice.stopSpeaking(); voice.setState('thinking');
   const ctx = context || state.context || null; state.context = null;
   if (state.screen !== 'canvas') { go('canvas'); await new Promise(r => setTimeout(r, 60)); }

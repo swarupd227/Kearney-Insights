@@ -49,10 +49,10 @@ async function realisation(cut, pA, pB) {
   const topShare = contributors.slice(0, 3).reduce((s, c) => s + c.contribution, 0) / (realB - realA || 1);
   drivers.sort((x, y) => x.effect - y.effect);
   const worst = drivers.filter(d => d.effect < -0.002);
-  const narrative = `Billing realisation${composer.scopeLabel(cut)} moved from ${pct(realA)} in ${pA.label} to ${pct(realB)} in ${pB.label}, ${pts(realB - realA)}. ` +
+  const narrative = `Billing realisation${composer.scopeIn(cut)} moved from ${pct(realA)} in ${pA.label} to ${pct(realB)} in ${pB.label}, ${pts(realB - realA)}. ` +
     (worst.length ? `The decline splits into ${listWords(worst.map(d => `${d.driver.toLowerCase()} (${pts(d.effect)})`))}. ` : 'No driver moved materially. ') +
     (contributors.length ? `Three engagements explain ${pct(Math.min(1, Math.abs(topShare)), 0)} of the change: ${listWords(contributors.slice(0, 3).map(c => `${c.engagement} (${c.client_name || 'client'}, ${c.fee_model === 'fixed' ? 'fixed fee' : c.fee_model === 'tm' ? 'time and materials' : 'value-based'}, realisation ${pct(c.realisation, 0)})`))}.` : '');
-  const spoken = `Realisation${composer.scopeLabel(cut)} fell ${pts(realB - realA)} to ${pct(realB)}. ${worst[0] ? worst[0].driver + ' is the largest driver' : 'No single driver dominates'}, and ${contributors[0] ? contributors[0].engagement + ' contributes most' : 'no engagement stands out'}. Ask me whether it will get worse.`;
+  const spoken = `Realisation${composer.scopeIn(cut)} fell ${pts(realB - realA)} to ${pct(realB)}. ${worst[0] ? worst[0].driver + ' is the largest driver' : 'No single driver dominates'}, and ${contributors[0] ? contributors[0].engagement + ' contributes most' : 'no engagement stands out'}. Ask me whether it will get worse.`;
   return {
     agent: 'Variance Agent', metric: 'billing_realisation', from: { period: pA, value: realA }, to: { period: pB, value: realB }, delta: realB - realA,
     drivers, contributors, narrative, spoken,
@@ -81,7 +81,7 @@ async function revenueVsPlan(cut, p) {
   steps.push({ label: 'Actual', value: totalActual, kind: 'end' });
   const vol = units.reduce((s, u) => s + u.volume_effect, 0), real = units.reduce((s, u) => s + u.realisation_effect, 0);
   const driverSteps = [{ label: 'Plan', value: totalPlan, kind: 'start' }, { label: 'Volume (standard value)', value: vol, kind: 'delta' }, { label: 'Realisation', value: real, kind: 'delta' }, { label: 'Actual', value: totalActual, kind: 'end' }];
-  const narrative = `Revenue${composer.scopeLabel(cut)} was ${money(totalActual)} against a plan of ${money(totalPlan)} for ${p.label}, a gap of ${money(gap)} (${pct(totalActual / totalPlan - 1)}). ` +
+  const narrative = `Revenue${composer.scopeIn(cut)} was ${money(totalActual)} against a plan of ${money(totalPlan)} for ${p.label}, a gap of ${money(gap)} (${pct(totalActual / totalPlan - 1)}). ` +
     (behind.length ? `${listWords(behind.slice(0, 3).map(u => `${u.label} (${money(u.gap)})`))} ${behind.length > 1 ? 'are' : 'is'} behind plan. ` : 'Every unit is at or above plan. ') +
     `Of the gap, ${money(vol)} comes from volume (fewer standard-value hours than the plan assumed) and ${money(real)} from realisation.` +
     (behind.some(u => u.realisation_effect < -1e5) ? ` ${[...behind].sort((a, b) => a.realisation_effect - b.realisation_effect)[0].label} shows the largest realisation effect; ask why realisation dropped there.` : '');
@@ -143,7 +143,7 @@ async function utilisation(cut, pA, pB) {
   const [ga, gb] = await Promise.all([engine.pmAgg(cut, pA, g), engine.pmAgg(cut, pB, g)]);
   const am = Object.fromEntries(ga.map(r => [r.key, r]));
   const contributors = gb.map(r => { const x = am[r.key]; const before = x ? x.chargeable / x.available : null; const after = r.chargeable / r.available; return { member: r.key, label: ref.labelOf(g, r.key), before, after, change: before !== null ? after - before : null, contribution: before !== null ? (after - before) * (r.available / B.available) : null, people: r.people }; }).sort((x, y) => (x.contribution || 0) - (y.contribution || 0));
-  const narrative = `Utilisation${composer.scopeLabel(cut)} moved from ${pct(uA)} in ${pA.label} to ${pct(uB)} in ${pB.label} (${pts(uB - uA)}). Chargeable demand contributed ${pts(demand)} and available capacity ${pts(capacity)}. ${contributors[0] ? `${contributors[0].label} contributed most (${pts(contributors[0].contribution)}).` : ''}`;
+  const narrative = `Utilisation${composer.scopeIn(cut)} moved from ${pct(uA)} in ${pA.label} to ${pct(uB)} in ${pB.label} (${pts(uB - uA)}). Chargeable demand contributed ${pts(demand)} and available capacity ${pts(capacity)}. ${contributors[0] ? `${contributors[0].label} contributed most (${pts(contributors[0].contribution)}).` : ''}`;
   return { agent: 'Variance Agent', metric: 'utilisation', from: { period: pA, value: uA }, to: { period: pB, value: uB }, delta: uB - uA, drivers: [{ driver: 'Demand', effect: demand }, { driver: 'Capacity', effect: capacity }], contributors, narrative, spoken: narrative,
     visual: composer.waterfall(`Utilisation bridge${composer.scopeLabel(cut)}`, `${pA.label} to ${pB.label}`, steps, 'pct', lineageFor('utilisation', cut, pB, ['person_months', 'people'])),
     table: composer.table(`Contribution by ${g}`, '', [['label', g === 'level' ? 'Level' : 'Unit'], ['before', pA.label, 'pct'], ['after', pB.label, 'pct'], ['change', 'Change', 'pts'], ['contribution', 'Contribution', 'pts'], ['people', 'People']], contributors, lineageFor('utilisation', cut, pB, ['person_months'])),
@@ -159,7 +159,7 @@ async function profitPerPartner(cut, pA, pB) {
   const steps = [{ label: pA.label, value: v(pa), kind: 'start' }];
   const drivers = Object.entries(parts).map(([k, x]) => ({ driver: k, effect: gap * x / sumParts })); drivers.forEach(d => steps.push({ label: d.driver, value: d.effect, kind: 'delta' }));
   steps.push({ label: pB.label, value: v(pb), kind: 'end' });
-  const narrative = `Profit per partner${composer.scopeLabel(cut)} moved from ${money(v(pa))} to ${money(v(pb))} (${pct(v(pb) / v(pa) - 1)}). Margin went from ${pct(v(ma))} to ${pct(v(mb))}, revenue per professional from ${money(v(ra))} to ${money(v(rb))} and leverage from ${v(la).toFixed(1)} to ${v(lb).toFixed(1)}. ${drivers.sort((x, y) => Math.abs(y.effect) - Math.abs(x.effect))[0].driver} moved profit per partner most.`;
+  const narrative = `Profit per partner${composer.scopeIn(cut)} moved from ${money(v(pa))} to ${money(v(pb))} (${pct(v(pb) / v(pa) - 1)}). Margin went from ${pct(v(ma))} to ${pct(v(mb))}, revenue per professional from ${money(v(ra))} to ${money(v(rb))} and leverage from ${v(la).toFixed(1)} to ${v(lb).toFixed(1)}. ${drivers.sort((x, y) => Math.abs(y.effect) - Math.abs(x.effect))[0].driver} moved profit per partner most.`;
   return { agent: 'Variance Agent', metric: 'profit_per_partner', drivers, narrative, spoken: narrative, tree: { ppp: [v(pa), v(pb)], margin: [v(ma), v(mb)], rpp: [v(ra), v(rb)], leverage: [v(la), v(lb)] },
     visual: composer.waterfall('Profit per partner driver tree', `${pA.label} to ${pB.label}`, steps, 'money', pb.lineage), followUps: ['What would a 3% rate increase in North America do to profit per partner?', 'Show margin by region', 'Show leverage by unit'] };
 }
@@ -169,7 +169,7 @@ async function margin(cut, pA, pB) {
   const mA = (A.billed - A.staff_cost - A.unrecovered) / A.billed, mB = (B.billed - B.staff_cost - B.unrecovered) / B.billed;
   const cost = -((B.staff_cost / B.billed) - (A.staff_cost / A.billed)); const unrec = -((B.unrecovered / B.billed) - (A.unrecovered / A.billed));
   const steps = [{ label: pA.label, value: mA, kind: 'start' }, { label: 'Staff cost ratio', value: cost, kind: 'delta' }, { label: 'Unrecovered expenses', value: unrec, kind: 'delta' }, { label: pB.label, value: mB, kind: 'end' }];
-  const narrative = `Contribution margin${composer.scopeLabel(cut)} moved from ${pct(mA)} to ${pct(mB)} (${pts(mB - mA)}): staff cost ratio ${pts(cost)}, unrecovered expenses ${pts(unrec)}.`;
+  const narrative = `Contribution margin${composer.scopeIn(cut)} moved from ${pct(mA)} to ${pct(mB)} (${pts(mB - mA)}): staff cost ratio ${pts(cost)}, unrecovered expenses ${pts(unrec)}.`;
   return { agent: 'Variance Agent', metric: 'contribution_margin', drivers: [{ driver: 'Staff cost ratio', effect: cost }, { driver: 'Unrecovered expenses', effect: unrec }], narrative, spoken: narrative, visual: composer.waterfall('Margin bridge', `${pA.label} to ${pB.label}`, steps, 'pct', lineageFor('contribution_margin', cut, pB, ['engagement_months'])), followUps: ['Show margin by unit', 'Which engagements have the lowest margin?', 'Forecast margin to year end'] };
 }
 async function generic(metricId, cut, pA, pB) {
@@ -183,7 +183,7 @@ async function generic(metricId, cut, pA, pB) {
   if (additive) { for (const c of contributors) steps.push({ label: c.label, value: c.change || 0, kind: 'delta' }); }
   steps.push({ label: pB.label, value: total.after, kind: 'end' });
   const { fmt } = require('./util');
-  const narrative = `${m.name}${composer.scopeLabel(cut)} moved from ${fmt(total.before, m.format)} in ${pA.label} to ${fmt(total.after, m.format)} in ${pB.label}. ${contributors.length ? `The largest fall was in ${contributors[0].label} and the largest rise in ${contributors[contributors.length - 1].label}.` : ''}`;
+  const narrative = `${m.name}${composer.scopeIn(cut)} moved from ${fmt(total.before, m.format)} in ${pA.label} to ${fmt(total.after, m.format)} in ${pB.label}. ${contributors.length ? `The largest fall was in ${contributors[0].label} and the largest rise in ${contributors[contributors.length - 1].label}.` : ''}`;
   return { agent: 'Variance Agent', metric: metricId, contributors, narrative, spoken: narrative, visual: additive ? composer.waterfall(`${m.name} bridge`, `${pA.label} to ${pB.label}`, steps, m.format, tb.lineage) : composer.fromMetric(b, { compareMap: am, compareName: pA.label }), followUps: [`Forecast ${m.name.toLowerCase()} to year end`, `Show ${m.name.toLowerCase()} by month`, 'What should I do about it?'] };
 }
 function empty(metricId, cut, p) { return { agent: 'Variance Agent', metric: metricId, narrative: 'There is not enough data in this cut and period to build a bridge.', spoken: 'There is not enough data for a bridge here.', drivers: [], contributors: [], visual: null, followUps: [] }; }

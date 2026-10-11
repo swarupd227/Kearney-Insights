@@ -51,6 +51,8 @@ function forecastChart(title, subtitle, history, forecast, plan, format, lineage
   const x = [...history.map(h => monthLabel(h.month)), ...forecast.map(f => monthLabel(f.month))];
   return { type: 'forecast', title, subtitle, x, actual: [...history.map(h => h.value), ...forecast.map(() => null)], p50: [...history.map(() => null), ...forecast.map(f => f.p50)], p10: [...history.map(() => null), ...forecast.map(f => f.p10)], p90: [...history.map(() => null), ...forecast.map(f => f.p90)], plan: plan || null, format, seeded: true, lineage, splitIndex: history.length };
 }
+// Sentence form of the scope: " in Europe", " in DACH, Principal". Chart titles keep the comma form from scopeLabel.
+function scopeIn(cut) { const l = scopeLabel(cut); return l ? ' in' + l.slice(1) : ''; }
 function scopeLabel(cut) {
   if (!cut) return '';
   const parts = [];
@@ -59,4 +61,4 @@ function scopeLabel(cut) {
   return parts.length ? ', ' + parts.join(', ') : '';
 }
 function qLabel(s) { const d = new Date(s + 'T00:00:00Z'); return 'Q' + (Math.floor(d.getUTCMonth() / 3) + 1) + ' ' + d.getUTCFullYear(); }
-module.exports = { fromMetric, waterfall, heatmap, table, forecastChart, scopeLabel };
+module.exports = { scopeIn, fromMetric, waterfall, heatmap, table, forecastChart, scopeLabel };

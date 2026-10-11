@@ -52,5 +52,5 @@ test('formatting', () => {
   assert.strictEqual(money(-5700000), '−US$5.7 million');
   assert.strictEqual(money(0.06), 'US$0.06');
   assert.strictEqual(pct(0.8364), '83.6%');
-  assert.strictEqual(pts(-0.082), '-8.2 points');
+  assert.strictEqual(pts(-0.082), '−8.2 points');
 });

@@ -11,15 +11,15 @@ let worldLoaded = null;
 export async function ensureWorld() { if (worldLoaded) return worldLoaded; worldLoaded = fetch('vendor/world.json').then(r => r.json()).then(g => { echarts.registerMap('world', g); return true; }).catch(() => false); return worldLoaded; }
 
 export const fmt = {
-  money: v => v === null || v === undefined || isNaN(v) ? '–' : (Math.abs(v) >= 1e9 ? (v / 1e9).toFixed(2) + 'B' : Math.abs(v) >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : Math.abs(v) >= 1e3 ? (v / 1e3).toFixed(0) + 'K' : v.toFixed(0)).replace(/^(-?)/, '$1US$'),
-  pct: (v, d = 1) => v === null || v === undefined || isNaN(v) ? '–' : (v * 100).toFixed(d) + '%',
-  pts: v => v === null || v === undefined || isNaN(v) ? '–' : (v > 0 ? '+' : '') + (v * 100).toFixed(1) + ' pts',
+  money: v => v === null || v === undefined || isNaN(v) ? '–' : (Math.abs(v) >= 1e9 ? (v / 1e9).toFixed(2) + 'B' : Math.abs(v) >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : Math.abs(v) >= 1e3 ? (v / 1e3).toFixed(0) + 'K' : v.toFixed(0)).replace(/^-/, '−').replace(/^(−?)/, '$1US$'),
+  pct: (v, d = 1) => v === null || v === undefined || isNaN(v) ? '–' : (v * 100).toFixed(d).replace(/^-/, '−') + '%',
+  pts: v => v === null || v === undefined || isNaN(v) ? '–' : (v > 0 ? '+' : '') + (v * 100).toFixed(1).replace(/^-/, '−') + ' pts',
   number: v => v === null || v === undefined || isNaN(v) ? '–' : Number(v).toLocaleString('en-US', { maximumFractionDigits: 0 }),
   number1: v => v === null || v === undefined || isNaN(v) ? '–' : Number(v).toLocaleString('en-US', { maximumFractionDigits: 1 }),
   days: v => v === null || v === undefined || isNaN(v) ? '–' : Math.round(v) + ' d', months: v => v === null || v === undefined ? '–' : Math.round(v) + ' mo', hours: v => v === null || v === undefined ? '–' : Number(v).toFixed(1) + ' h', ratio: v => v === null || v === undefined ? '–' : Number(v).toFixed(1) + 'x', score: v => v === null || v === undefined ? '–' : Number(v).toFixed(1)
 };
 export function f(v, format) { return (fmt[format] || fmt.number)(v); }
-function axisFmt(format) { return v => format === 'money' ? fmt.money(v) : format === 'pct' ? (v * 100).toFixed(0) + '%' : fmt.number(v); }
+function axisFmt(format) { return v => format === 'money' ? fmt.money(v) : format === 'pct' ? (v * 100).toFixed(0).replace(/^-/, '−') + '%' : fmt.number(v); }
 // Every answer builds in front of the viewer: lines draw left to right, bars rise in sequence, waterfall steps drop in one by one, numbers count up.
 const base = () => ({ backgroundColor: 'transparent', textStyle: { color: T.text, fontFamily: 'inherit' }, animationDuration: 1100, animationEasing: 'cubicOut', animationDurationUpdate: 400, grid: { left: 8, right: 16, top: 30, bottom: 8, containLabel: true }, tooltip: { backgroundColor: T.tooltip, borderColor: T.border, textStyle: { color: T.text, fontSize: 12 } }, legend: { textStyle: { color: T.muted, fontSize: 11 }, top: 0, right: 0, icon: 'circle', itemWidth: 8, itemHeight: 8 } });
 const axisStyleOf = () => ({ axisLine: { lineStyle: { color: T.border } }, axisTick: { show: false }, axisLabel: { color: T.muted, fontSize: 11 }, splitLine: { lineStyle: { color: T.split } } });

@@ -100,8 +100,9 @@ export function renderTable(t, opts = {}) {
   if (!t) return null;
   const cols = t.columns;
   const thead = h('tr', {}, ...cols.map(c => h('th', { class: c[2] ? 'num' : '' }, c[1])));
-  const rows = (t.rows || []).slice(0, opts.limit || 60).map(r => h('tr', { onClick: opts.onRow ? () => opts.onRow(r) : null, style: opts.onRow ? { cursor: 'pointer' } : null }, ...cols.map(c => cell(r[c[0]], c[2], c[0], r))));
-  const wrap = h('div', { class: 'card' }, t.title ? h('h3', {}, t.title) : null, t.subtitle ? h('div', { class: 'sub' }, t.subtitle) : null, h('div', { class: 'table-wrap' }, h('table', { class: 'data' }, h('thead', {}, thead), h('tbody', {}, ...rows))), h('div', { class: 'card-foot' }, seededBadge(t.seeded !== false), t.lineage ? lineageButton(t.lineage) : null));
+  const limit = opts.limit || 60, total = (t.rows || []).length;
+  const rows = (t.rows || []).slice(0, limit).map(r => h('tr', { onClick: opts.onRow ? () => opts.onRow(r) : null, style: opts.onRow ? { cursor: 'pointer' } : null }, ...cols.map(c => cell(r[c[0]], c[2], c[0], r))));
+  const wrap = h('div', { class: 'card' }, t.title ? h('h3', {}, t.title) : null, t.subtitle ? h('div', { class: 'sub' }, t.subtitle) : null, h('div', { class: 'table-wrap' }, h('table', { class: 'data' }, h('thead', {}, thead), h('tbody', {}, ...rows))), h('div', { class: 'card-foot' }, seededBadge(t.seeded !== false), t.lineage ? lineageButton(t.lineage) : null, total > limit ? h('span', { class: 'muted small' }, `Showing ${limit} of ${total} rows; the slide and board carry the full table`) : null));
   return wrap;
 }
 function cell(v, format, key, row) {
@@ -131,7 +132,7 @@ export function renderVisual(spec, { onPoint, compact = false, titleOverride } =
   if (spec.subtitle) card.appendChild(h('div', { class: 'sub' }, spec.subtitle));
   const el = h('div', { class: 'chart' + (spec.type === 'map' || spec.type === 'heatmap' || spec.type === 'network' ? ' tall' : compact ? ' short' : '') });
   card.appendChild(el);
-  const foot = h('div', { class: 'card-foot' }, spec.badge ? seededBadge(false, spec.badge) : seededBadge(spec.seeded !== false), spec.lineage ? lineageButton(spec.lineage) : null, spec.type !== 'kpi' ? h('span', { class: 'muted small' }, 'Click a point, then ask “Why this?”') : null);
+  const foot = h('div', { class: 'card-foot' }, spec.badge ? seededBadge(false, spec.badge) : seededBadge(spec.seeded !== false), spec.lineage ? lineageButton(spec.lineage) : null, spec.type !== 'kpi' ? h('span', { class: 'hint muted small' }, 'Select a point to ask “Why this?” or drill in') : null);
   card.appendChild(foot);
   setTimeout(() =>renderChart(el, spec, { onPoint: onPoint || defaultPointAndAsk(spec, card) }));
   return card;
@@ -180,12 +181,17 @@ export function answerCard(a, { compact = false } = {}) {
   if (a.visual) vis.appendChild(renderVisual(a.visual, { compact }));
   if (a.visual2) vis.appendChild(renderVisual(a.visual2, { compact }));
   if (a.table) vis.appendChild(Object.assign(renderTable(a.table, { limit: 15 }), { className: 'card' + (a.visual && a.visual2 ? ' span-2' : '') }));
-  if (vis.children.length) card.appendChild(vis);
+  if (vis.children.length) {
+    // One lineage button per answer (in the footer) and one chart hint; the embedded cards keep their badges only.
+    [...vis.querySelectorAll('.card-foot')].forEach((f, i) => { f.querySelectorAll('button').forEach(b => b.remove()); if (i > 0) f.querySelectorAll('.hint').forEach(x => x.remove()); if (!f.children.length) f.remove(); });
+    card.appendChild(vis);
+  }
+  const lineage = a.lineage || (a.visual && a.visual.lineage) || (a.table && a.table.lineage) || null;
   if (a.followUps && a.followUps.length) card.appendChild(h('div', { class: 'chips' }, ...a.followUps.map(q => h('button', { class: 'chip', onClick: () => ask(q) }, q))));
-  card.appendChild(h('div', { class: 'answer-foot' }, a.seeded === false ? seededBadge(false) : seededBadge(true),  h('span', { class: 'spacer' }), a.lineage ? lineageButton(a.lineage, { model: a.model }) : null, h('button', { class: 'btn ghost small', onClick: () => ask('Pin this to my board') }, 'Pin'), h('button', { class: 'btn ghost small', title: 'Download this answer as a PowerPoint slide', onClick: () => exportSlide(a, card) }, 'Slide'), h('button', { class: 'btn ghost small', title: 'Build a Claude Motion prompt from this answer', onClick: () => animateAnswer(a) }, 'Animate'), h('button', { class: 'btn ghost small', onClick: () => document.dispatchEvent(new CustomEvent('astra:speak', { detail: a.spoken })) }, '🔈 Speak'), h('button', { class: 'btn ghost small', title: 'Rate this answer', onClick: () => { api('feedback', { body: { value: 1 } }).catch(() => {}); toast('Thanks, recorded in the observatory.'); } }, '👍'), h('button', { class: 'btn ghost small', onClick: () => { api('feedback', { body: { value: -1 } }).catch(() => {}); toast('Thanks, recorded in the observatory.'); } }, '👎')));
+  card.appendChild(h('div', { class: 'answer-foot' }, a.seeded === false ? seededBadge(false) : seededBadge(true),  h('span', { class: 'spacer' }), lineage ? lineageButton(lineage, { model: a.model }) : null, h('button', { class: 'btn ghost small', title: 'Pin this answer to your board', onClick: () => ask('Pin this to my board') }, 'Pin'), h('button', { class: 'btn ghost small', title: 'Download this answer as a PowerPoint slide', onClick: () => exportSlide(a, card) }, 'Slide'), h('button', { class: 'btn ghost small', title: 'Build a Claude Motion prompt from this answer', onClick: () => animateAnswer(a) }, 'Animate'), h('button', { class: 'btn ghost small', title: 'Read this answer aloud', onClick: () => document.dispatchEvent(new CustomEvent('astra:speak', { detail: a.spoken })) }, '▶ Listen'), h('button', { class: 'btn ghost small', title: 'Rate this answer', onClick: () => { api('feedback', { body: { value: 1 } }).catch(() => {}); toast('Thanks. Your rating is recorded.'); } }, '👍'), h('button', { class: 'btn ghost small', onClick: () => { api('feedback', { body: { value: -1 } }).catch(() => {}); toast('Thanks. Your rating is recorded.'); } }, '👎')));
   return card;
 }
 function shortAction(s) { return s.length > 46 ? s.slice(0, 44) + '…' : s; }
-function emphasise(text) { return esc(text || '').replace(/(US\$[\d.,]+ (billion|million|thousand)|[+−-]?\d+(\.\d+)? points|\b\d+(\.\d+)?%|\b[EP]-\d{4,5}\b|\bINV-\d+|\bOPP-[\w]+)/g, '<strong>$1</strong>'); }
+function emphasise(text) { return esc(text || '').replace(/([−-]?US\$[\d.,]+ (billion|million|thousand)|[+−-]?\d+(\.\d+)? points|\b\d+(\.\d+)?%|\b[EP]-\d{4,5}\b|\bINV-\d+|\bOPP-[\w]+)/g, '<strong>$1</strong>'); }
 export function screenHead(title, sub, right) { return h('div', { class: 'screen-head' }, h('div', {}, h('h1', {}, title), sub ? h('div', { class: 'sub' }, sub) : null), right || null); }
 export function promptChips(qs) { return h('div', { class: 'chips' }, ...qs.map(q => h('button', { class: 'chip', onClick: () => ask(q) }, '✦ ' + q))); }

@@ -9,8 +9,8 @@ function money(v, opts = {}) {
   if (abs < 10) return `${sign}US$${abs.toFixed(2)}`;
   return `${sign}US$${abs.toFixed(0)}`;
 }
-function pct(v, digits = 1) { if (v === null || v === undefined || isNaN(v)) return 'n/a'; return (v * 100).toFixed(digits) + '%'; }
-function pts(v, digits = 1) { if (v === null || v === undefined || isNaN(v)) return 'n/a'; const s = (v * 100).toFixed(digits); return (v > 0 ? '+' : '') + s + ' points'; }
+function pct(v, digits = 1) { if (v === null || v === undefined || isNaN(v)) return 'n/a'; return (v * 100).toFixed(digits).replace(/^-/, '−') + '%'; }
+function pts(v, digits = 1) { if (v === null || v === undefined || isNaN(v)) return 'n/a'; const s = (v * 100).toFixed(digits).replace(/^-/, '−'); return (v > 0 ? '+' : '') + s + ' points'; }
 function num(v, digits = 0) { if (v === null || v === undefined || isNaN(v)) return 'n/a'; return Number(v).toLocaleString('en-US', { maximumFractionDigits: digits, minimumFractionDigits: digits }); }
 function fmt(v, format, digits) {
   switch (format) {
