@@ -83,10 +83,10 @@ if ! az postgres flexible-server show -n "$PG_SERVER" -g "$RG" -o none 2>/dev/nu
   az postgres flexible-server create -n "$PG_SERVER" -g "$RG" -l "$LOCATION" \
     --admin-user "$PG_ADMIN" --admin-password "$PG_PASSWORD" \
     --sku-name Standard_B2s --tier Burstable --storage-size 32 --version 16 \
-    --public-access 0.0.0.0 --database-name "$PG_DB" --yes -o none
-else
-  az postgres flexible-server db create -g "$RG" -s "$PG_SERVER" -d "$PG_DB" -o none 2>/dev/null || true
+    --public-access 0.0.0.0 --yes -o none
 fi
+echo "==> Database $PG_DB"
+az postgres flexible-server db show -g "$RG" -s "$PG_SERVER" -d "$PG_DB" -o none 2>/dev/null || az postgres flexible-server db create -g "$RG" -s "$PG_SERVER" -d "$PG_DB" -o none
 PG_HOST=$(az postgres flexible-server show -n "$PG_SERVER" -g "$RG" --query fullyQualifiedDomainName -o tsv)
 DATABASE_URL="postgres://${PG_ADMIN}:${PG_PASSWORD}@${PG_HOST}:5432/${PG_DB}?sslmode=require"
 
