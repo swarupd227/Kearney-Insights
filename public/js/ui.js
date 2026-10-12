@@ -171,7 +171,7 @@ function scenarioTable(spec) {
 export function kpiTile(tile, onClick) {
   const good = tile.delta == null ? null : (tile.delta >= 0) === tile.higherIsBetter;
   const statusColor = good === null ? 'var(--faint)' : good ? 'var(--good)' : 'var(--bad)';
-  const deltaText = tile.delta == null ? (tile.compare ? '' : '') : (tile.deltaKind === 'pts' ? FMT.pts(tile.delta) : (tile.delta >= 0 ? '+' : '') + (tile.delta * 100).toFixed(1) + '%') + (tile.compare ? ' vs ' + tile.compare.label : '');
+  const deltaText = tile.delta == null ? (tile.compare ? '' : '') : (tile.deltaKind === 'pts' ? FMT.pts(tile.delta) : (tile.delta >= 0 ? '+' : '') + (tile.delta * 100).toFixed(1).replace(/^-/, '−') + '%') + (tile.compare ? ' vs ' + tile.compare.label : '');
   const el = h('div', { class: 'tile', onClick, title: 'Open on the canvas' },
     h('div', { class: 'name' }, h('span', {}, h('span', { class: 'status', style: { background: statusColor } }), tile.name), seededBadge(true)),
     countUp(h('div', { class: 'value' }, tile.value == null ? '–' : fmtValue(tile.value, tile.format)), tile.value, tile.format),

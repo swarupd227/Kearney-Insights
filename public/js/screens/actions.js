@@ -16,7 +16,7 @@ export async function render(root) {
         h('div', { class: 'row' }, h('div', { class: 't' }, a.title), h('span', { class: 'badge ' + (p.source === 'prediction' ? 'accent' : '') }, p.source === 'prediction' ? 'Raised by the product' : 'From your question')),
         p.impact ? h('div', { class: 'impact' }, h('span', { class: 'v' }, '≈ ' + F(p.impact, 'money')), h('span', { class: 'x' }, p.impact_text)) : p.impact_text ? h('div', { class: 'impact' }, h('span', { class: 'x' }, p.impact_text)) : null,
         h('div', { class: 'meta' }, p.evidence ? 'Why: ' + p.evidence : `Triggered by: “${a.trigger_insight}”`),
-        h('div', { class: 'meta' }, `Owner: ${a.owner} · due ${dateShort(a.due_date)} · ${a.connector} · ${a.status}${a.decided_by ? ' by ' + a.decided_by : ''}${p.edited_by ? ' · edited by ' + p.edited_by : ''}`),
+        h('div', { class: 'meta' }, `Owner: ${a.owner} · due ${dateShort(a.due_date)} · ${a.connector}${a.status === 'pending' ? '' : ' · ' + a.status + (a.decided_by ? ' by ' + a.decided_by : '')}${p.edited_by ? ' · edited by ' + p.edited_by : ''}`),
         h('div', { class: 'body' }, a.body),
         p.connector_result ? h('div', { class: 'badge accent' }, p.connector_result) : null),
       a.status === 'pending'
@@ -39,5 +39,5 @@ export async function render(root) {
     screenHead('Action centre', `${pending.length} waiting for approval${total ? ' · worth about ' + F(total, 'money') : ''}${raised ? ` · ${raised} raised by the predictions` : ''} · Approved actions go to Workday, Salesforce, ServiceNow, Teams or Outlook. In demo mode they are recorded and nothing is sent.`,
       h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' } }, h('button', { class: 'btn small', title: 'Read the queue aloud', onClick: () => document.dispatchEvent(new CustomEvent('astra:speak', { detail: spokenQueue() })) }, '▶ Read me the queue'), h('button', { class: 'btn small', onClick: () => ask('What should I do about it?') }, 'Draft actions from the last insight'))),
     h('div', { class: 'grid', style: { gap: '10px' } }, ...(pending.length ? pending.map(card) : [h('div', { class: 'card muted' }, 'No drafts waiting. The predictions raise their own drafts each morning; ask “What should I do about it?” after any insight to draft more.')])),
-    done.length ? h('div', { style: { marginTop: '20px' } }, h('div', { class: 'muted small', style: { marginBottom: '8px' } }, 'Decided'), h('div', { class: 'grid', style: { gap: '10px' } }, ...done.slice(0, 12).map(card))) : null);
+    done.length ? h('div', { style: { marginTop: '20px' } }, h('div', { class: 'muted small', style: { marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '.05em' } }, `Decided (${done.length})`), h('div', { class: 'grid', style: { gap: '10px' } }, ...done.slice(0, 12).map(card))) : null);
 }

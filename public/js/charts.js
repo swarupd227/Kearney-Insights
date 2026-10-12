@@ -121,9 +121,12 @@ function burndownOpt(s) { const o = forecastOpt({ ...s, plan: null, format: 'num
 function heatmapOpt(s) {
   const o = base(); const vals = s.cells.map(c => c.value).filter(v => v !== null); const min = Math.min(...vals), max = Math.max(...vals);
   o.grid = { left: 8, right: 70, top: 10, bottom: 8, containLabel: true };
-  o.xAxis = { type: 'category', data: s.x, ...axisStyleOf(), splitArea: { show: false }, axisLabel: { ...axisStyleOf().axisLabel, interval: 0, rotate: s.x.length > 8 ? 35 : 0, fontSize: 10.5 } }; o.yAxis = { type: 'category', data: s.y, ...axisStyleOf(), inverse: true };
+  const longNames = s.x.some(n => String(n).length > 9);
+  o.xAxis = { type: 'category', data: s.x, ...axisStyleOf(), splitArea: { show: false }, axisLabel: { ...axisStyleOf().axisLabel, interval: 0, rotate: s.x.length > 8 || (longNames && s.x.length > 4) ? 35 : 0, width: 96, overflow: 'truncate', fontSize: 10.5 } }; o.yAxis = { type: 'category', data: s.y, ...axisStyleOf(), inverse: true };
   o.visualMap = { min, max, calculable: false, orient: 'vertical', right: 0, top: 'middle', inRange: { color: s.invert ? [T.bad, T.heatMid, T.good] : [T.heatLow, T.accent, T.bad] }, textStyle: { color: T.muted, fontSize: 10 }, formatter: v => f(v, s.format), itemWidth: 10 };
-  o.series = [{ type: 'heatmap', data: s.cells.map(c => [c.x, c.y, c.value]), animationDelay: idx => idx * 25, animationDuration: 500, label: { show: true, color: '#fff', fontSize: 10.5, formatter: p => s.format === 'pct' ? (p.value[2] * 100).toFixed(0) + '%' : f(p.value[2], s.format) }, itemStyle: { borderColor: T.surface, borderWidth: 2, borderRadius: 4 }, emphasis: { itemStyle: { borderColor: T.accent2 } } }];
+  // Cell labels: white on the dark theme; on the light theme the pale end of the scale (low values, or the middle of an inverted scale) takes dark text.
+  const span = Math.max(1e-9, max - min); const pale = v => { if (T.labelOnBar !== '#ffffff') return false; const t = (v - min) / span; return s.invert ? Math.abs(t - 0.5) < 0.25 : t < 0.45; };
+  o.series = [{ type: 'heatmap', data: s.cells.map(c => ({ value: [c.x, c.y, c.value], label: { color: c.value !== null && pale(c.value) ? T.text : '#fff' } })), animationDelay: idx => idx * 25, animationDuration: 500, label: { show: true, color: '#fff', fontSize: 10.5, formatter: p => s.format === 'pct' ? (p.value[2] * 100).toFixed(0) + '%' : f(p.value[2], s.format) }, itemStyle: { borderColor: T.surface, borderWidth: 2, borderRadius: 4 }, emphasis: { itemStyle: { borderColor: T.accent2 } } }];
   o.tooltip.formatter = p => { const c = s.cells[p.dataIndex]; return `${s.x[c.x]} · ${s.y[c.y]}<br>${f(c.value, s.format)}${c.n ? ` · ${c.n} people` : ''}${c.expected ? ` · ${c.expected.toFixed(1)} expected exits` : ''}`; };
   return o;
 }
