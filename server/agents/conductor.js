@@ -31,8 +31,17 @@ const llm = require('./llm');
 const personas = require('../personas');
 const { fmt, pct, money, countWord } = require('./util');
 
+// Conversation memory is kept in Postgres (one row per session) so a follow-up keeps its context whichever replica answers it
+// and across restarts; the in-process map is only a fallback when the database is unavailable.
 const sessions = new Map();
-function memoryFor(sessionId) { if (!sessions.has(sessionId)) sessions.set(sessionId, { history: [] }); return sessions.get(sessionId); }
+async function memoryFor(sessionId) {
+  try { const row = await db.one('SELECT memory FROM conversation_memory WHERE session=$1', [sessionId]); if (row && row.memory) { sessions.set(sessionId, row.memory); return row.memory; } } catch (e) { console.error('memory load', e.message); }
+  if (!sessions.has(sessionId)) sessions.set(sessionId, { history: [] }); return sessions.get(sessionId);
+}
+async function saveMemory(sessionId, memory) {
+  if (memory.history.length > 40) memory.history = memory.history.slice(-40);
+  try { await db.query('INSERT INTO conversation_memory (session, memory, updated_at) VALUES ($1,$2,now()) ON CONFLICT (session) DO UPDATE SET memory=EXCLUDED.memory, updated_at=now()', [sessionId, JSON.stringify(memory)]); } catch (e) { console.error('memory save', e.message); }
+}
 
 class Timeline {
   constructor() { this.steps = []; }
@@ -43,7 +52,7 @@ class Timeline {
 async function ask({ question, personaId, sessionId = 'default', context = {} }) {
   const t0 = Date.now();
   const persona = personas.byId[personaId] || personas.byId.mp;
-  const memory = memoryFor(sessionId);
+  const memory = await memoryFor(sessionId);
   const tl = new Timeline();
   const parsed = await tl.run('Conductor', 'Classified intent and planned the work', async () => parser.parse(question, { persona, memory: memory.last ? { client: memory.last.client, metrics: memory.last.metrics } : null }));
   // screen context (point and ask): clicked element supplies the cut
@@ -86,7 +95,7 @@ async function ask({ question, personaId, sessionId = 'default', context = {} })
     await guardian.log(persona.id, 'guardian_block', { question, policy: verdict.policy, reason: verdict.reason });
     const answer = { question, intent: parsed.intent, persona: persona.id, blocked: true, headline: verdict.reason, spoken: `I cannot show that. ${verdict.reason.split('.')[0]}. The block is recorded in the audit log.`, visual: null, table: null, agents: tl.steps, followUps: plan.blockedFollowUps || ['Show aggregates by unit and level instead', 'Show me what the agents did today', 'Open the agent observatory'], guardian: { result: 'block', reason: verdict.reason, policy: verdict.policy, checks: verdict.checks }, lineage: null, seeded: config.demoMode, screen: 'canvas', kind: 'blocked', duration_ms: Date.now() - t0, cost_usd: 0, usage: llm.takeUsage() };
     await logRun(persona, question, parsed.intent, tl, answer, true);
-    memory.history.push({ question, kind: 'blocked' });
+    memory.history.push({ question, kind: 'blocked' }); await saveMemory(sessionId, memory);
     return answer;
   }
   if (verdict.result === 'redact') { plan.redact = verdict.reason; plan.aggregateOnly = true; }
@@ -108,7 +117,7 @@ async function ask({ question, personaId, sessionId = 'default', context = {} })
   };
   answer.cost_usd = answer.usage ? Math.round(answer.usage.cost * 10000) / 10000 : 0;
   memory.last = { question, intent: parsed.intent, metrics: parsed.metrics, cut: parsed.cut, period: parsed.period, kind: answer.kind, client: parsed.cut.client || (memory.last && memory.last.client), lineage: answer.lineage, contributors: out.contributors || null, engagements: out.engagements || null, units: out.units || null, ranked: out.ranked || null, people: out.people || null, candidates: out.candidates || (memory.last && parsed.intent === 'action_centre' ? memory.last.candidates : null), roleText: out.roleText || (memory.last && parsed.intent === 'action_centre' ? memory.last.roleText : null), nextBest: out.nextBest || null, draftIds: out.drafts ? out.drafts.map(d => d.id) : (memory.last && parsed.intent === 'action_centre' ? memory.last.draftIds : null), clientObj: out.client || null, narrative: answer.headline, compare: parsed.compare || (memory.last && memory.last.compare) };
-  memory.history.push({ question, kind: answer.kind });
+  memory.history.push({ question, kind: answer.kind }); await saveMemory(sessionId, memory);
   await logRun(persona, question, parsed.intent, tl, answer, false);
   return answer;
 }

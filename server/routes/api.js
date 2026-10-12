@@ -103,7 +103,7 @@ router.get('/lineage/:id', wrap(async (req, res) => { const m = catalogue.byId[r
 // Actions (screen 14)
 router.get('/actions', wrap(async (req, res) => { if (req.query.refresh) await action.refreshQueue().catch(e => console.error('queue refresh', e.message)); res.json(await action.list(personaOf(req))); }));
 router.post('/actions/:id/decide', wrap(async (req, res) => { const persona = personaOf(req); const row = await action.decide(parseInt(req.params.id, 10), req.body.decision, persona, req.body.edit); res.json(row); }));
-router.post('/actions/draft', wrap(async (req, res) => { const persona = personaOf(req); const memory = conductor.memoryFor(req.body.session || 'default'); res.json(await action.draftFromContext(persona, memory)); }));
+router.post('/actions/draft', wrap(async (req, res) => { const persona = personaOf(req); const memory = await conductor.memoryFor(req.body.session || 'default'); res.json(await action.draftFromContext(persona, memory)); }));
 
 // Boards
 router.get('/boards', wrap(async (req, res) => res.json(await db.query('SELECT * FROM boards WHERE persona=$1 ORDER BY created_at DESC', [personaOf(req).id]))));

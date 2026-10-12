@@ -167,6 +167,9 @@ CREATE TABLE IF NOT EXISTS metric_anomalies (
   id SERIAL PRIMARY KEY, metric_id TEXT, dimension TEXT, member TEXT, month DATE,
   value NUMERIC, expected NUMERIC, lower NUMERIC, upper NUMERIC, severity TEXT, direction TEXT
 );
+CREATE TABLE IF NOT EXISTS conversation_memory (
+  session TEXT PRIMARY KEY, memory JSONB NOT NULL, updated_at TIMESTAMPTZ DEFAULT now()
+);
 CREATE TABLE IF NOT EXISTS app_settings (
   key TEXT PRIMARY KEY, value JSONB NOT NULL, updated_at TIMESTAMPTZ DEFAULT now(), updated_by TEXT
 );
