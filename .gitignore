@@ -4,3 +4,6 @@ infra/.deploy.env
 server/seed/seed-output.json
 npm-debug.log
 .DS_Store
+
+# Claude Code worktrees and session files
+.claude/
