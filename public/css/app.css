@@ -7,11 +7,16 @@
   --radius: 14px; --radius-s: 9px; --shadow: 0 10px 30px rgba(0,0,0,.35);
   --mono: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
   --font: "Segoe UI Variable Text", "Segoe UI", Inter, system-ui, -apple-system, Roboto, sans-serif;
+  color-scheme: dark;
 }
-:root[data-theme="light"] { --bg: #f5f6fa; --surface: #ffffff; --surface-2: #f1f2f7; --surface-3: #e8eaf1; --border: #dde0e8; --border-2: #c9cdd8; --text: #15181f; --muted: #5a6172; --faint: #8b91a1; --accent: #6b55e6; --accent-2: #4f3bc9; --accent-dim: rgba(107,85,230,.12); }
+:root[data-theme="light"] { --bg: #f5f6fa; --surface: #ffffff; --surface-2: #f1f2f7; --surface-3: #e8eaf1; --border: #dde0e8; --border-2: #c9cdd8; --text: #15181f; --muted: #5a6172; --faint: #8b91a1; --accent: #6b55e6; --accent-2: #4f3bc9; --accent-dim: rgba(107,85,230,.12); color-scheme: light; }
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 15px; line-height: 1.45; }
-button, input { font: inherit; color: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; }
+::placeholder { color: var(--faint); opacity: 1; }
+/* Text fields, date fields, selects and textareas share the command bar's focus ring instead of the browser's own. */
+input[type="text"]:focus, input[type="password"]:focus, input[type="date"]:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent) !important; box-shadow: 0 0 0 3px var(--accent-dim); }
+.cmd input:focus { box-shadow: none; }
 a { color: var(--accent-2); cursor: pointer; }
 .muted { color: var(--muted); } .faint { color: var(--faint); } .small { font-size: 12.5px; } .mono { font-family: var(--mono); }
 .good { color: var(--good); } .bad { color: var(--bad); } .warn { color: var(--warn); }
@@ -79,6 +84,7 @@ a { color: var(--accent-2); cursor: pointer; }
 .btn:hover { border-color: var(--accent); color: var(--accent-2); }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
 .btn.primary:hover { background: var(--accent-2); color: #0b0d12; }
+:root[data-theme="light"] .btn.primary:hover { color: #fff; }
 .btn.ghost { background: transparent; }
 .btn.small { padding: 4px 10px; font-size: 12.5px; }
 .btn.good { border-color: var(--good); color: var(--good); } .btn.bad { border-color: var(--bad); color: var(--bad); }
@@ -87,10 +93,11 @@ a { color: var(--accent-2); cursor: pointer; }
 .screen-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; margin-bottom: 18px; }
 .screen-head h1 { font-size: 22px; font-weight: 600; margin: 0; letter-spacing: -.01em; }
 .screen-head .sub { color: var(--muted); font-size: 13.5px; margin-top: 2px; }
+.screen-head .btn { white-space: nowrap; }
 .grid { display: grid; gap: 16px; }
 .cols-2 { grid-template-columns: 1fr 1fr; } .cols-3 { grid-template-columns: repeat(3, 1fr); } .cols-4 { grid-template-columns: repeat(4, 1fr); } .cols-6 { grid-template-columns: repeat(6, 1fr); }
 .span-2 { grid-column: span 2; } .span-3 { grid-column: span 3; } .span-4 { grid-column: span 4; }
-@media (max-width: 1250px) { .cols-6 { grid-template-columns: repeat(3, 1fr); } .cols-4 { grid-template-columns: repeat(2, 1fr); } .cols-3 { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 1250px) { .cols-6 { grid-template-columns: repeat(3, 1fr); } .cols-4 { grid-template-columns: repeat(2, 1fr); } .cols-3 { grid-template-columns: 1fr 1fr; } .home-grid { grid-template-columns: 1fr; } }
 @media (max-width: 900px) { #app { grid-template-columns: 1fr; grid-template-areas: "top" "main" "dock"; } .rail { display: none; } .cols-2, .cols-3, .cols-4, .cols-6 { grid-template-columns: 1fr; } .span-2, .span-3, .span-4 { grid-column: span 1; } .dock-inner { grid-template-columns: 70px 1fr; } .dock-right { display: none; } .seed-banner { display: none; } .persona-title { max-width: 140px; } .main { padding: 16px; } }
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; position: relative; min-width: 0; }
 .card.flat { background: transparent; }
