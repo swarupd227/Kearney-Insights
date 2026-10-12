@@ -12,7 +12,7 @@ process.chdir(here);
 const raw = spawnSync('ffmpeg', ['-v', 'error', '-i', seg.file, '-vf', `fps=${FPS},scale=16:9`, '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-'], { maxBuffer: 1 << 30 }).stdout;
 const n = Math.floor(raw.length / (16 * 9 * 3)); const cls = new Array(n);
 for (let f = 0; f < n; f++) { let r = 0, g = 0, b = 0; const o = f * 432; for (let i = 0; i < 432; i += 3) { r += raw[o + i]; g += raw[o + i + 1]; b += raw[o + i + 2]; } r /= 144; g /= 144; b /= 144; cls[f] = (r > 180 && b > 180 && g < 90) ? 'M' : (g > 180 && b > 180 && r < 90) ? 'C' : '.'; }
-const runs = []; for (let f = 0; f < n; f++) { if (cls[f] === '.') continue; const last = runs[runs.length - 1]; if (last && last.c === cls[f] && f - last.end <= 2) last.end = f; else runs.push({ c: cls[f], start: f, end: f }); }
+const runs = []; for (let f = 0; f < n; f++) { if (cls[f] === '.') continue; const last = runs[runs.length - 1]; if (last && last.c === cls[f] && f - last.end <= 15) last.end = f; else runs.push({ c: cls[f], start: f, end: f }); } // a marker is held 1.1 s; a dropped frame inside it must not split the run
 const pairs = []; for (let i = 0; i < runs.length; i++) { if (runs[i].c !== 'M') continue; const next = runs.slice(i + 1).find(r => r.c === 'C'); if (next) pairs.push({ from: (runs[i].end + 1) / FPS, to: next.start / FPS }); }
 console.log(`${n} frames, ${runs.length} marker runs, ${pairs.length} scenes for ${seg.scenes.length} expected`);
 if (pairs.length !== seg.scenes.length) { console.error('scene count mismatch; runs:', JSON.stringify(runs.map(r => r.c + '@' + (r.start / FPS).toFixed(1)))); process.exit(1); }
