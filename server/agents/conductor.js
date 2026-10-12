@@ -72,7 +72,8 @@ async function ask({ question, personaId, sessionId = 'default', context = {} })
       if (Array.isArray(lp.metrics)) parsed.metrics = lp.metrics.filter(m => catalogue.byId[m]);
       if (lp.cut && typeof lp.cut === 'object') for (const [k, v] of Object.entries(lp.cut)) if (dims[k] && dims[k].includes(v)) parsed.cut[k] = v;
       if (['month', 'quarter', 'year', 'region', 'unit', 'office', 'practice', 'industry', 'level', 'client', 'engagement'].includes(lp.groupBy)) parsed.groupBy = lp.groupBy;
-      if (['last_month', 'last_quarter', 'qtd', 'ytd', 'ltm', 'last_6m', 'last_3y'].includes(lp.period)) parsed.period = lp.period;
+      // The planner may choose a period only when the question speaks of time and the dictionary parser found none; otherwise the parser's (or the default) period stands, so the same question gives the same period on every run.
+      if (!parsed.period && /year|quarter|month|week|to date|ytd|qtd|last |since|\bq[1-4]\b|20\d\d|this |recent/.test(question.toLowerCase()) && ['last_month', 'last_quarter', 'qtd', 'ytd', 'ltm', 'last_6m', 'last_3y'].includes(lp.period)) parsed.period = lp.period;
       if (['plan', 'ly'].includes(lp.compare)) parsed.compare = lp.compare;
       parsed.plannedBy = st.label;
     }
