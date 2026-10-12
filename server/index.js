@@ -13,8 +13,9 @@ const guardian = require('./agents/guardian');
 
 async function main() {
   await db.migrate();
-  const seeded = await db.isSeeded();
+  const seeded = await db.isSeeded(); const wanted = require('./seed/manifest.json').version;
   if (!seeded && config.seedOnBoot) { console.log('Database is empty: loading the seed (about 30 seconds)…'); await require('./seed/load').load({ log: console.log }); }
+  else if (seeded && seeded !== wanted && config.seedOnBoot) { console.log(`Seed version ${seeded} in the database, ${wanted} in the manifest: reloading the seed (about 30 seconds)…`); await require('./seed/load').load({ force: true, log: console.log }); }
   else console.log(`Seed version ${seeded || 'none'}`);
   await ref.load(); await guardian.init();
 
