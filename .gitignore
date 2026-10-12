@@ -7,3 +7,16 @@ npm-debug.log
 
 # Claude Code worktrees and session files
 .claude/
+
+# Demo video working files (the pipeline scripts are committed, the media is not)
+tools/demo-video/rec/
+tools/demo-video/cuts/
+tools/demo-video/narration/
+tools/demo-video/*.mp4
+tools/demo-video/*.png
+!tools/demo-video/artizent-logo.png
+tools/demo-video/*.ttf
+tools/demo-video/*.json
+tools/demo-video/*.txt
+tools/demo-video/*.log
+demo-video/
