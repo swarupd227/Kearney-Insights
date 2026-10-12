@@ -105,6 +105,10 @@ router.get('/actions', wrap(async (req, res) => { if (req.query.refresh) await a
 router.post('/actions/:id/decide', wrap(async (req, res) => { const persona = personaOf(req); const row = await action.decide(parseInt(req.params.id, 10), req.body.decision, persona, req.body.edit); res.json(row); }));
 router.post('/actions/draft', wrap(async (req, res) => { const persona = personaOf(req); const memory = await conductor.memoryFor(req.body.session || 'default'); res.json(await action.draftFromContext(persona, memory)); }));
 
+router.post('/actions/:id/preview', wrap(async (req, res) => res.json(await action.preview(parseInt(req.params.id, 10)))));
+// Demo reset: clears what the demo produces (drafts, boards, memory, audit trail), never the firm data; the predictions refill the queue.
+router.post('/admin/reset-demo', wrap(async (req, res) => { if (!config.demoMode) return res.status(403).json({ error: 'Only available in demo mode' }); await db.query('TRUNCATE actions, audit_log, boards, conversation_memory RESTART IDENTITY'); const raised = await action.refreshQueue(); await db.query('INSERT INTO audit_log (persona, event, detail) VALUES ($1,$2,$3)', [personaOf(req).id, 'demo_reset', JSON.stringify({ raised: raised.length })]); res.json({ ok: true, raised: raised.length }); }));
+
 // Boards
 router.get('/boards', wrap(async (req, res) => res.json(await db.query('SELECT * FROM boards WHERE persona=$1 ORDER BY created_at DESC', [personaOf(req).id]))));
 router.post('/boards', wrap(async (req, res) => { const p = personaOf(req); const row = await db.one('INSERT INTO boards (persona, title, question, visual, schedule) VALUES ($1,$2,$3,$4,$5) RETURNING *', [p.id, req.body.title, req.body.question, JSON.stringify(req.body.visual || {}), req.body.schedule || null]); res.json(row); }));

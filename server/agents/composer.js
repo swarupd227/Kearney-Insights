@@ -47,9 +47,9 @@ function heatmap(title, subtitle, xLabels, yLabels, cells, format, lineage, opts
   return { type: 'heatmap', title, subtitle, x: xLabels, y: yLabels, cells, format, seeded: true, lineage, ...opts };
 }
 function table(title, subtitle, columns, rows, lineage, opts = {}) { return { type: 'table', title, subtitle, columns, rows, seeded: opts.seeded !== false, lineage, ...opts }; }
-function forecastChart(title, subtitle, history, forecast, plan, format, lineage) {
+function forecastChart(title, subtitle, history, forecast, plan, format, lineage, withActions) {
   const x = [...history.map(h => monthLabel(h.month)), ...forecast.map(f => monthLabel(f.month))];
-  return { type: 'forecast', title, subtitle, x, actual: [...history.map(h => h.value), ...forecast.map(() => null)], p50: [...history.map(() => null), ...forecast.map(f => f.p50)], p10: [...history.map(() => null), ...forecast.map(f => f.p10)], p90: [...history.map(() => null), ...forecast.map(f => f.p90)], plan: plan || null, format, seeded: true, lineage, splitIndex: history.length };
+  return { type: 'forecast', title, subtitle, x, actual: [...history.map(h => h.value), ...forecast.map(() => null)], p50: [...history.map(() => null), ...forecast.map(f => f.p50)], p10: [...history.map(() => null), ...forecast.map(f => f.p10)], p90: [...history.map(() => null), ...forecast.map(f => f.p90)], plan: plan || null, with_actions: withActions || null, format, seeded: true, lineage, splitIndex: history.length };
 }
 // Sentence form of the scope: " in Europe", " in DACH, Principal". Chart titles keep the comma form from scopeLabel.
 function scopeIn(cut) { const l = scopeLabel(cut); return l ? ' in' + l.slice(1) : ''; }

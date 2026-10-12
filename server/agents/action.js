@@ -18,6 +18,7 @@ const n = v => (v === null || v === undefined || isNaN(Number(v))) ? 0 : Number(
 const REPLACEMENT_COST = { PARTNER: 1.5e6, AP: 1.1e6, PRINCIPAL: 8e5, MANAGER: 4e5, ASSOCIATE: 2.5e5, BA: 1.5e5 };
 const COST_FACTOR = { NA: 1.25, DACH: 1.15, UKI: 1.15, ME: 1.3, IND: 0.38 }; // loaded-cost factors, the same as the scenario agent
 const TARGET_MARGIN = 0.5;
+const monthsLeftInYear = () => Math.max(0, engine.monthsBetween(engine.LAST_CLOSED, engine.LAST_CLOSED.slice(0, 4) + '-12-01'));
 
 // ---- Expected effect of an action, from the data. Returns { impact, text }; impact in US$.
 async function pricingEffect(ids) {
@@ -25,7 +26,7 @@ async function pricingEffect(ids) {
   const P = new engine.Params(); const from = engine.addMonths(engine.LAST_CLOSED, -5);
   const r = await db.one(`SELECT COALESCE(SUM(write_off),0) AS wo, COALESCE(SUM(discount),0) AS disc, COALESCE(SUM(standard_value),0) AS std FROM engagement_months WHERE engagement_id = ANY(${P.add(ids)}) AND month >= ${P.add(from)}`, P.values);
   const excess = Math.max(0, n(r.disc) - 0.10 * n(r.std)); const leak = n(r.wo) + excess; const impact = 0.5 * leak;
-  return { impact, text: `Realisation recovered over the next six months if half of the last six months' write-offs (${money(n(r.wo))}) and discounts above 10% (${money(excess)}) are stopped` };
+  return { impact, kind: 'revenue', in_year: impact * Math.min(1, monthsLeftInYear() / 6), targets: ids, text: `Realisation recovered over the next six months if half of the last six months' write-offs (${money(n(r.wo))}) and discounts above 10% (${money(excess)}) are stopped` };
 }
 async function staffingEffect(engId) {
   if (!engId) return null;
@@ -33,37 +34,38 @@ async function staffingEffect(engId) {
   const weeks = Math.max(2, Math.min(12, Math.round((new Date(e.end_date) - new Date(engine.TODAY)) / (7 * 86400000))));
   const lvl = ref.get().levels.find(l => l.id === 'ASSOCIATE'); const local = COST_FACTOR[e.unit] || 1; const hours = 2 * weeks * 45;
   const impact = Math.max(0, hours * lvl.cost_rate * (local - COST_FACTOR.IND));
-  return { impact, text: `Lower loaded cost over ${weeks} weeks: two Associate roles (${num(hours)} hours) delivered from India at ${money(lvl.cost_rate * COST_FACTOR.IND)} an hour instead of ${money(lvl.cost_rate * local)}` };
+  return { impact, kind: 'cost', in_year: impact, targets: [e.id], text: `Lower loaded cost over ${weeks} weeks: two Associate roles (${num(hours)} hours) delivered from India at ${money(lvl.cost_rate * COST_FACTOR.IND)} an hour instead of ${money(lvl.cost_rate * local)}` };
 }
 function retentionEffect(expected, level, label) {
   const cost = REPLACEMENT_COST[level] || 2.5e5; const impact = n(expected) * 0.3 * cost;
-  return { impact, text: `Replacement cost avoided if one in three conversations changes the outcome: ${num(expected)} expected exits in ${label}, ${money(cost)} to replace each ${ref.labelOf('level', level)}` };
+  return { impact, kind: 'cost', in_year: 0, text: `Replacement cost avoided if one in three conversations changes the outcome: ${num(expected)} expected exits in ${label}, ${money(cost)} to replace each ${ref.labelOf('level', level)}` };
 }
 function pipelineEffect(opps) {
   const weighted = opps.reduce((a, o) => a + n(o.value) * n(o.win_prob), 0); const gross = opps.reduce((a, o) => a + n(o.value), 0);
-  return { impact: weighted, text: `Weighted value back in motion: ${money(gross)} gross across ${opps.length} opportunities, weighted by win probability` };
+  const yearEnd = engine.LAST_CLOSED.slice(0, 4) + '-12-31'; const inYear = opps.filter(o => o.expected_close && String(o.expected_close instanceof Date ? o.expected_close.toISOString() : o.expected_close).slice(0, 10) <= yearEnd).reduce((a, o) => a + n(o.value) * n(o.win_prob), 0) * 0.25; // a quarter of an accelerated win bills before year end
+  return { impact: weighted, kind: 'revenue', in_year: inYear, targets: opps.map(o => o.id), text: `Weighted value back in motion: ${money(gross)} gross across ${opps.length} opportunities, weighted by win probability` };
 }
 function cashEffect(invoices) {
   const expected = invoices.reduce((a, i) => a + n(i.amount) * n(i.late_prob), 0); const gross = invoices.reduce((a, i) => a + n(i.amount), 0);
-  return { impact: expected, text: `Collected within 30 days of the reminder, from ${money(gross)} outstanding (each invoice weighted by its late-payment probability)` };
+  return { impact: expected, kind: 'cash', in_year: 0, targets: invoices.map(i => i.id), text: `Collected within 30 days of the reminder, from ${money(gross)} outstanding (each invoice weighted by its late-payment probability)` };
 }
 function recoveryEffect(e) {
   const fees = n(e.budget_fees); const m = n(e.margin_at_completion); const impact = Math.max(0, (TARGET_MARGIN - m) * fees);
-  return { impact, text: `Margin at risk: ${pct(m, 0)} margin at completion against a ${pct(TARGET_MARGIN, 0)} target on ${money(fees)} of fees` };
+  return { impact, kind: 'margin', in_year: 0, targets: [e.id], text: `Margin at risk: ${pct(m, 0)} margin at completion against a ${pct(TARGET_MARGIN, 0)} target on ${money(fees)} of fees` };
 }
 async function introductionEffect(practiceId, prob) {
   if (!practiceId) return null;
   const P = new engine.Params();
   const r = await db.one(`SELECT AVG(budget_fees) AS fee FROM engagements WHERE practice = ${P.add(practiceId)} AND budget_fees > 0`, P.values);
   const fee = n(r && r.fee); const share = n(prob) || 0.3; const impact = fee * share * 0.3;
-  return { impact, text: `Expected from a typical ${ref.labelOf('practice', practiceId)} engagement of ${money(fee)}: ${pct(share, 0)} of similar clients bought it, one in three introductions assumed to convert` };
+  return { impact, kind: 'bookings', in_year: 0, text: `Expected from a typical ${ref.labelOf('practice', practiceId)} engagement of ${money(fee)}: ${pct(share, 0)} of similar clients bought it, one in three introductions assumed to convert` };
 }
 async function feesOf(ids) { if (!ids.length) return 0; const P = new engine.Params(); const r = await db.one(`SELECT COALESCE(SUM(budget_fees),0) AS fees FROM engagements WHERE id = ANY(${P.add(ids)})`, P.values); return n(r.fees); }
 
 async function insert(persona, trigger, d, extra = {}) {
   // A draft with a key that is already waiting is not raised twice; the existing draft is returned instead.
   if (d.key) { const dup = await db.one(`SELECT * FROM actions WHERE status='pending' AND payload->>'key' = $1 LIMIT 1`, [d.key]); if (dup) return dup; }
-  const payload = { ...extra, key: d.key || null, impact: d.effect ? Math.round(d.effect.impact) : null, impact_text: d.effect ? d.effect.text : (d.note || null), evidence: d.evidence || null, ask: d.ask || null, model: d.model || null };
+  const payload = { ...extra, key: d.key || null, impact: d.effect ? Math.round(d.effect.impact) : null, impact_text: d.effect ? d.effect.text : (d.note || null), effect_kind: d.effect ? d.effect.kind || null : null, in_year: d.effect ? Math.round(d.effect.in_year || 0) : 0, targets: d.targets || (d.effect && d.effect.targets) || null, evidence: d.evidence || null, ask: d.ask || null, model: d.model || null };
   return db.one('INSERT INTO actions (persona, trigger_insight, action_type, title, body, owner, due_date, status, connector, payload) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *', [persona, trigger, d.action_type, d.title, d.body, d.owner, d.due_date, 'pending', d.connector, JSON.stringify(payload)]);
 }
 
@@ -76,7 +78,7 @@ async function draftFromContext(persona, memory) {
     const contributors = (last.contributors || last.engagements || []).slice(0, 3);
     const unit = last.cut && last.cut.unit ? ref.labelOf('unit', last.cut.unit) : 'the unit';
     const ids = contributors.map(c => c.engagement || c.id);
-    drafts.push({ action_type: 'pricing_review', connector: 'Salesforce (opportunity and contract notes)', title: `Pricing review for ${ids.join(', ')}`, owner: 'Office or unit leader, ' + unit, due_date: due(10), effect: await pricingEffect(ids), ask: last.question, body: `Review rate discounts and fixed-fee scope on ${ids.join(', ')}: realisation ${contributors.map(c => `${c.engagement || c.id} ${pct(c.realisation ?? c.realisation_forecast, 0)}`).join(', ')}. Confirm change orders for scope added since signature and reset discount authority above 10%.` });
+    drafts.push({ action_type: 'pricing_review', connector: 'Salesforce (opportunity and contract notes)', title: `Pricing review for ${ids.join(', ')}`, owner: 'Office or unit leader, ' + unit, due_date: due(10), effect: await pricingEffect(ids), targets: ids, ask: last.question, body: `Review rate discounts and fixed-fee scope on ${ids.join(', ')}: realisation ${contributors.map(c => `${c.engagement || c.id} ${pct(c.realisation ?? c.realisation_forecast, 0)}`).join(', ')}. Confirm change orders for scope added since signature and reset discount authority above 10%.` });
     drafts.push({ action_type: 'staffing_change', connector: 'Staffing system (generic interface)', title: `Staffing change: add cross-border capacity to ${ids[0] || 'the engagement'}`, owner: 'Staffing manager', due_date: due(5), effect: await staffingEffect(ids[0]), ask: `Show me Associates with SAP experience rolling off in the next three weeks`, body: `Replace two Associate roles on ${ids[0] || 'the engagement'} with Associates rolling off in another unit within two weeks, to reduce overrun hours at a lower loaded cost. Candidates are proposed on request.` });
     drafts.push({ action_type: 'note', connector: 'Outlook (draft to engagement partners)', title: `Note to the engagement partners on ${ids.join(', ')}`, owner: persona.title, due_date: due(2), note: `Confirms the recovery plan on ${money(await feesOf(ids))} of fees`, ask: last.question, body: `Draft for your edit: "The SAP data shows realisation on ${ids.join(', ')} below the unit average, driven by write-offs and fixed-fee overrun. Please confirm the recovery plan, the change-order position and the expected margin at completion by ${dateLabel(due(7))}."` });
   } else if (last.kind === 'talent') {
@@ -136,13 +138,65 @@ async function refreshQueue() {
   if (stalled.length) drafts.push({ key: 'stalled:firm', action_type: 'pipeline_push', connector: 'Salesforce (tasks to partners)', title: `Next steps on ${stalled.length} stalled opportunities above US$1 million`, owner: 'Partners owning the opportunities', due_date: due(10), effect: pipelineEffect(stalled), model: 'Win probability', evidence: `No activity for 30 days; the largest is ${stalled[0].id} (${stalled[0].client_name || stalled[0].client_id}, ${money(stalled[0].value)})`, ask: 'Which large deals have not moved for 30 days?', body: `A Salesforce task to each owning partner: confirm the next step and its date within two weeks, or move the opportunity to lost so the forecast stays honest. Opportunities: ${stalled.map(o => o.id).join(', ')}.` });
   const inserted = [];
   for (const d of drafts) {
-    if (existing.has(d.key)) { await db.query(`UPDATE actions SET payload = payload || $2 WHERE status='pending' AND payload->>'key' = $1`, [d.key, JSON.stringify({ impact: d.effect ? Math.round(d.effect.impact) : null, impact_text: d.effect ? d.effect.text : null, evidence: d.evidence || null })]); continue; }
+    if (existing.has(d.key)) { await db.query(`UPDATE actions SET payload = payload || $2 WHERE status='pending' AND payload->>'key' = $1`, [d.key, JSON.stringify({ impact: d.effect ? Math.round(d.effect.impact) : null, impact_text: d.effect ? d.effect.text : null, effect_kind: d.effect ? d.effect.kind || null : null, in_year: d.effect ? Math.round(d.effect.in_year || 0) : 0, targets: d.targets || (d.effect && d.effect.targets) || null, evidence: d.evidence || null })]); continue; }
     inserted.push(await insert('system', d.evidence, d, { source: 'prediction' }));
   }
   if (inserted.length) await db.query('INSERT INTO audit_log (persona, event, detail) VALUES ($1,$2,$3)', ['system', 'actions_raised', JSON.stringify({ keys: inserted.map(a => a.payload.key), total_impact: inserted.reduce((a, r) => a + n(r.payload.impact), 0) })]);
   return inserted;
 }
 
+// What the approved (or waiting) actions add up to: total effect, and the part that is revenue before year end.
+async function effectsSummary(status) {
+  const rows = await db.query('SELECT id, title, payload FROM actions WHERE status=$1', [status]);
+  const out = { n: rows.length, impact: 0, revenue_in_year: 0, cost_in_year: 0, cash: 0, titles: [] };
+  for (const r of rows) { const p = r.payload || {}; out.impact += n(p.impact); if (p.effect_kind === 'revenue') { out.revenue_in_year += n(p.in_year); if (n(p.in_year) > 0) out.titles.push(r.title); } else if (p.effect_kind === 'cost') out.cost_in_year += n(p.in_year); else if (p.effect_kind === 'cash') out.cash += n(p.impact); }
+  return out;
+}
+// "Show the effect before I approve": a before/after view computed from the data the draft names.
+async function preview(id) {
+  const a = await db.one('SELECT * FROM actions WHERE id=$1', [id]); if (!a) return null;
+  const p = a.payload || {}; const ids = p.targets || ((a.title + ' ' + a.body).match(/\b[EP]-\d{4,5}\b|\bOPP-[\w]+\b|\bINV-\d+\b/g) || []);
+  const eng = ids.filter(x => /^E-/.test(x)); const opps = ids.filter(x => /^OPP-/.test(x)); const invs = ids.filter(x => /^INV-/.test(x));
+  const P = new engine.Params();
+  switch (a.action_type) {
+    case 'pricing_review': {
+      if (!eng.length) break;
+      const from = engine.addMonths(engine.LAST_CLOSED, -5);
+      const rows = await db.query(`SELECT engagement_id, SUM(standard_value) std, SUM(billed) billed, SUM(discount) disc, SUM(write_off) wo FROM engagement_months WHERE engagement_id = ANY(${P.add(eng)}) AND month >= ${P.add(from)} GROUP BY 1 ORDER BY 1`, P.values);
+      let gain = 0; const out = rows.map(r => { const std = n(r.std), billed = n(r.billed); const excess = Math.max(0, n(r.disc) - 0.10 * std); const rec = 0.5 * (n(r.wo) + excess); gain += rec; return { metric: `${r.engagement_id} realisation`, before: std ? billed / std : null, after: std ? (billed + rec) / std : null, format: 'pct', good: true }; });
+      out.push({ metric: 'Revenue recovered over six months', before: null, after: gain, format: 'money', good: true });
+      return { title: 'If discounts are capped at 10% and half of the write-offs stop (the last six months as the base)', beforeLabel: 'Now', afterLabel: 'With the review', rows: out, text: `About ${money(gain)} of realisation recovered over six months across ${eng.length} engagement${eng.length === 1 ? '' : 's'}.` };
+    }
+    case 'staffing_change': {
+      const e = eng[0] ? (await engine.engagementList({ engagement: eng[0] }, null))[0] : null; if (!e) break;
+      const weeks = Math.max(2, Math.min(12, Math.round((new Date(e.end_date) - new Date(engine.TODAY)) / (7 * 86400000)))); const lvl = ref.get().levels.find(l => l.id === 'ASSOCIATE'); const local = COST_FACTOR[e.unit] || 1; const hours = 2 * weeks * 45;
+      const costBefore = hours * lvl.cost_rate * local, costAfter = hours * lvl.cost_rate * COST_FACTOR.IND; const fees = n(e.budget_fees); const m = n(e.margin_at_completion); const mAfter = fees ? m + (costBefore - costAfter) / fees : m;
+      return { title: `Two Associate roles on ${e.id} for ${weeks} weeks, delivered from India instead of ${ref.labelOf('unit', e.unit)}`, beforeLabel: 'As staffed', afterLabel: 'Cross-border', rows: [{ metric: 'Loaded cost of the two roles', before: costBefore, after: costAfter, good: true }, { metric: 'Margin at completion', before: m, after: mAfter, format: 'pct', good: true }, { metric: 'Estimate at completion', before: n(e.eac), after: n(e.eac) - (costBefore - costAfter), good: true }], text: `${money(costBefore - costAfter)} lower loaded cost; margin at completion moves from ${pct(m, 0)} to ${pct(mAfter, 0)}. Same hours, same delivery dates.` };
+    }
+    case 'recovery_plan': {
+      const e = eng[0] ? (await engine.engagementList({ engagement: eng[0] }, null))[0] : null; if (!e) break;
+      const fees = n(e.budget_fees), m = n(e.margin_at_completion); const eacTarget = fees * (1 - TARGET_MARGIN); const burn = n(e.hours_to_date) / Math.max(1, n(e.budget_hours));
+      return { title: `${e.id}: if the remaining scope is delivered within budget`, beforeLabel: 'Current course', afterLabel: 'Recovery plan', rows: [{ metric: 'Margin at completion', before: m, after: Math.max(m, TARGET_MARGIN), format: 'pct', good: true }, { metric: 'Estimate at completion', before: n(e.eac), after: Math.min(n(e.eac), eacTarget), good: true }, { metric: 'Budget hours used so far', before: burn, after: burn, format: 'pct' }], text: `Holding the remaining scope within budget protects about ${money(Math.max(0, (TARGET_MARGIN - m) * fees))} of margin on ${money(fees)} of fees.` };
+    }
+    case 'pipeline_push': {
+      if (!opps.length) break;
+      const rows = await db.query(`SELECT o.id, o.value, o.win_prob, o.expected_close, c.name AS client_name FROM opportunities o LEFT JOIN clients c ON c.id=o.client_id WHERE o.id = ANY(${P.add(opps)}) ORDER BY o.value DESC`, P.values);
+      const out = rows.map(o => ({ metric: `${o.id} · ${o.client_name || ''}`, before: n(o.value), after: n(o.value) * n(o.win_prob), good: true })); const weighted = out.reduce((a, r) => a + r.after, 0);
+      return { title: 'The opportunities the task goes to, with their win probability', beforeLabel: 'Value', afterLabel: 'Weighted', rows: out, text: `${money(weighted)} of weighted value back in motion; the year-end forecast counts a quarter of it as revenue before December.` };
+    }
+    case 'reminder': {
+      const cash = require('./cash'); const li = await cash.lateInvoices({ limit: 15 }); const target = invs.length ? li.invoices.filter(i => invs.includes(i.id)) : li.invoices.filter(i => n(i.late_prob) >= 0.8 && n(i.days_past_due) > 30);
+      if (!target.length) break;
+      const out = target.slice(0, 8).map(i => ({ metric: `${i.id} · ${i.client_name}`, before: n(i.amount), after: n(i.amount) * n(i.late_prob), good: true }));
+      return { title: 'The invoices the reminders go to', beforeLabel: 'Outstanding', afterLabel: 'Expected in 30 days', rows: out, text: `${money(target.reduce((a, i) => a + n(i.amount) * n(i.late_prob), 0))} expected within 30 days of the reminder across ${target.length} invoices.` };
+    }
+    case 'retention_brief': {
+      const m = /(\d+) expected exits/.exec(p.evidence || p.impact_text || ''); if (!m) break; const expected = Number(m[1]); const avoided = Math.round(expected * 0.3);
+      return { title: 'If one in three retention conversations changes the outcome', beforeLabel: 'Expected', afterLabel: 'With the briefs', rows: [{ metric: 'Regretted Principal exits in six months', before: expected, after: expected - avoided, format: 'number', good: true }, { metric: 'Replacement cost', before: expected * REPLACEMENT_COST.PRINCIPAL, after: (expected - avoided) * REPLACEMENT_COST.PRINCIPAL, good: true }], text: `About ${avoided} exits avoided and ${money(avoided * REPLACEMENT_COST.PRINCIPAL)} of replacement cost saved.` };
+    }
+  }
+  return { title: 'No simulation for this draft', rows: [], text: p.impact_text || 'The expected effect is estimated from the data the draft names.' };
+}
 async function list(persona) {
   const rows = await db.query('SELECT * FROM actions ORDER BY status, created_at DESC');
   const impact = r => n(r.payload && r.payload.impact);
@@ -179,4 +233,4 @@ async function confirmMatch(persona, candidate, context) {
 const POLICY = [
   { agent: 'Action Agent', may_read: 'Outputs of other agents, role profile', may_draft: 'Recovery plans, staffing changes, pricing review notes, retention conversation briefs, pipeline tasks, forecast updates, reminders, introduction notes; each with an expected effect and the assumption behind it', may_execute: 'Nothing. Every action is a draft until a named approver approves it', connectors: 'Workday, Salesforce, ServiceNow, Teams, Outlook, Anaplan, staffing system (stubs in demo mode)', approvers: 'The named owner on each draft; the approval is logged with the approver title, time and expected effect' }
 ];
-module.exports = { draftFromContext, refreshQueue, list, summary, decide, confirmMatch, POLICY };
+module.exports = { draftFromContext, refreshQueue, list, summary, decide, confirmMatch, effectsSummary, preview, POLICY };

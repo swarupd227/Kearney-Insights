@@ -8,7 +8,7 @@ const db = require('../db');
 const engine = require('../metrics/engine');
 const ref = require('../metrics/refcache');
 const composer = require('./composer');
-const { money, pct, monthLabel } = require('./util');
+const { money, pct, monthLabel, countWord } = require('./util');
 
 const Z90 = 1.2816;
 function addMonths(s, n) { return engine.addMonths(s, n); }
@@ -84,12 +84,25 @@ async function revenue({ cut = {}, horizon = { toYearEnd: true } }) {
   const fy = { actual_ytd: ytd, forecast_rest: restOfYear.reduce((a, f) => a + f.p50, 0) };
   fy.p50 = fy.actual_ytd + fy.forecast_rest; const sdFy = Math.sqrt(restOfYear.reduce((a, f) => a + f.sd * f.sd, 0)); fy.p10 = fy.p50 - Z90 * sdFy; fy.p90 = fy.p50 + Z90 * sdFy;
   if (plan) { const idx = hist.length; fy.plan = plan.slice(0, idx).filter((v, i) => hist[i].month.startsWith(year)).reduce((a, v) => a + (v || 0), 0) + plan.slice(idx).filter((v, i) => fMonths[i].startsWith(year)).reduce((a, v) => a + (v || 0), 0); fy.gap = fy.p50 - fy.plan; fy.prob_reach_plan = sdFy ? 1 - normalCdf((fy.plan - fy.p50) / sdFy) : null; }
+  // With the actions approved so far: their revenue effect before year end lifts the P50 (firm scope only; the actions are firm-wide).
+  let approved = null, pending = null, withSeries = null;
+  if (plan && Object.keys(cut).length === 0) {
+    try {
+      const act = require('./action'); approved = await act.effectsSummary('approved'); pending = await act.effectsSummary('pending');
+      fy.actions = { approved_n: approved.n, approved_revenue: approved.revenue_in_year, pending_n: pending.n, pending_revenue: pending.revenue_in_year };
+      if (approved.revenue_in_year > 0 && restOfYear.length) {
+        fy.with_actions = fy.p50 + approved.revenue_in_year; fy.gap_with_actions = fy.with_actions - fy.plan; fy.prob_with_actions = sdFy ? 1 - normalCdf((fy.plan - fy.with_actions) / sdFy) : null;
+        const per = approved.revenue_in_year / restOfYear.length; withSeries = [...hist.map(() => null), ...forecast.map(f => f.month.startsWith(year) ? f.p50 + per : null)];
+      }
+    } catch (e) { console.error('forecast with actions', e.message); }
+  }
   const scope = composer.scopeLabel(cut).replace(/^, /, '') || 'The firm';
   const narrative = `${scope} is forecast at ${money(fy.p50)} for ${year} (P10 ${money(fy.p10)}, P90 ${money(fy.p90)}), of which ${money(fy.actual_ytd)} is booked to ${monthLabel(last)}.` + (plan ? ` Against a full-year plan of ${money(fy.plan)} that is a gap of ${money(fy.gap)} (${pct(fy.p50 / fy.plan - 1)}); the probability of reaching plan is ${pct(fy.prob_reach_plan, 0)}.` : '') + ` The forecast blends booked work (${money(forecast.reduce((a, f) => a + f.booked, 0))} over the horizon), weighted pipeline (${money(forecast.reduce((a, f) => a + f.pipeline, 0))}) and the seasonal trend. Backtest error ${pct(bt.mape)} over the last ${bt.n} months.`;
   const spoken = plan ? `${scope} is ${fy.gap >= 0 ? 'on track' : 'behind'}: forecast ${money(fy.p50)} against plan ${money(fy.plan)}, with ${pct(fy.prob_reach_plan, 0)} probability of reaching plan. ${fy.gap < 0 ? 'Ask me why, and I will show the units behind it.' : 'Europe is the region to watch; ask me why.'}` : `${scope} is forecast at ${money(fy.p50)} for ${year}, with a band from ${money(fy.p10)} to ${money(fy.p90)}.`;
+  const actionsNote = (fy.with_actions ? ` The ${countWord(approved.n, 'action', null, { cap: false })} approved so far ${approved.n === 1 ? 'carries' : 'carry'} about ${money(approved.revenue_in_year)} of revenue before year end: the gap to plan ${fy.gap_with_actions >= 0 ? 'closes' : 'narrows to ' + money(fy.gap_with_actions)} and the probability of reaching plan moves to ${pct(fy.prob_with_actions, 0)}.` : '') + (pending && pending.revenue_in_year > 0 ? ` The drafts still waiting carry about ${money(pending.revenue_in_year)} more.` : '');
   const drivers = [{ driver: 'Booked unbilled work on live engagements', effect: forecast.reduce((a, f) => a + f.booked, 0) }, { driver: 'Weighted pipeline with start lag', effect: forecast.reduce((a, f) => a + f.pipeline, 0) }, { driver: 'Seasonal trend (12-month growth)', effect: td.growth - 1, format: 'pct' }];
-  return { agent: 'Forecast Agent', model: { id: 1, name: 'Revenue forecast', version: '1.0-seed', method: 'Bottom-up engagement forecast reconciled with top-down time series', backtest: bt }, history: hist, forecast, plan, fullYear: fy, narrative, spoken, drivers,
-    visual: composer.forecastChart(`Revenue forecast${composer.scopeLabel(cut)}`, `Monthly, P10–P90 band${plan ? ', against plan' : ''}`, hist, forecast, plan, 'money', { ...lineage, model: 'Revenue forecast v1.0-seed', backtest: bt, drivers: drivers.map(d => d.driver) }),
+  return { agent: 'Forecast Agent', model: { id: 1, name: 'Revenue forecast', version: '1.0-seed', method: 'Bottom-up engagement forecast reconciled with top-down time series', backtest: bt }, history: hist, forecast, plan, fullYear: fy, narrative: narrative + actionsNote, spoken, drivers,
+    visual: composer.forecastChart(`Revenue forecast${composer.scopeLabel(cut)}`, `Monthly, P10–P90 band${plan ? ', against plan' : ''}${withSeries ? ', and with the approved actions' : ''}`, hist, forecast, plan, 'money', { ...lineage, model: 'Revenue forecast v1.0-seed', backtest: bt, drivers: drivers.map(d => d.driver) }, withSeries),
     followUps: [fy.gap < 0 ? 'Why are we behind plan?' : 'Which units will miss plan this quarter?', 'What would a 3% rate increase in North America do to profit per partner?', 'Show the forecast by region'] };
 }
 async function unitsAtRisk({ cut = {}, period = 'qtd' }) {

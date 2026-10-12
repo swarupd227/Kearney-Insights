@@ -9,6 +9,16 @@ export async function render(root) {
   const pending = rows.filter(r => r.status === 'pending'), done = rows.filter(r => r.status !== 'pending');
   const total = pending.reduce((a, r) => a + n(r.payload && r.payload.impact), 0);
   const raised = pending.filter(r => r.payload && r.payload.source === 'prediction').length;
+  const inYear = pending.reduce((a, r) => a + (r.payload && r.payload.effect_kind === 'revenue' ? n(r.payload.in_year) : 0), 0);
+  // "Show the effect before I approve": a before/after view computed from the data the draft names, shown in place.
+  async function preview(a, el) {
+    const old = el.querySelector('.effect-panel'); if (old) { old.remove(); return; }
+    const r = await api(`actions/${a.id}/preview`, { body: {} });
+    const panel = h('div', { class: 'effect-panel' }, h('div', { class: 'muted small', style: { marginBottom: '6px' } }, r.title),
+      r.rows && r.rows.length ? h('table', { class: 'data' }, h('thead', {}, h('tr', {}, h('th', {}, ''), h('th', { class: 'num' }, r.beforeLabel || 'Before'), h('th', { class: 'num' }, r.afterLabel || 'After'))), h('tbody', {}, ...r.rows.map(x => h('tr', {}, h('td', {}, x.metric), h('td', { class: 'num' }, x.before == null ? '–' : F(x.before, x.format || 'money')), h('td', { class: 'num ' + (x.good ? 'good' : '') }, x.after == null ? '–' : F(x.after, x.format || 'money')))))) : null,
+      h('div', { class: 'small', style: { marginTop: '6px' } }, r.text));
+    el.firstChild.appendChild(panel);
+  }
   const card = a => {
     const p = a.payload || {}; const el = h('div', { class: 'action ' + a.status });
     const view = () => el.replaceChildren(
@@ -20,7 +30,7 @@ export async function render(root) {
         h('div', { class: 'body' }, a.body),
         p.connector_result ? h('div', { class: 'badge accent' }, p.connector_result) : null),
       a.status === 'pending'
-        ? h('div', { class: 'btns' }, h('button', { class: 'btn good small', onClick: () => decide(a.id, 'approve') }, 'Approve'), h('button', { class: 'btn small', onClick: edit }, 'Edit'), h('button', { class: 'btn bad small', onClick: () => decide(a.id, 'reject') }, 'Reject'), p.ask ? h('button', { class: 'btn ghost small', title: 'Open the analysis behind this draft', onClick: () => ask(p.ask) }, 'Show the evidence') : null)
+        ? h('div', { class: 'btns' }, h('button', { class: 'btn good small', onClick: () => decide(a.id, 'approve') }, 'Approve'), h('button', { class: 'btn small', onClick: edit }, 'Edit'), h('button', { class: 'btn bad small', onClick: () => decide(a.id, 'reject') }, 'Reject'), h('button', { class: 'btn ghost small', title: 'See the before and after this draft would produce', onClick: () => preview(a, el) }, 'Show the effect'), p.ask ? h('button', { class: 'btn ghost small', title: 'Open the analysis behind this draft', onClick: () => ask(p.ask) }, 'Show the evidence') : null)
         : h('div', { class: 'muted small' }, a.decided_at ? dateTimeShort(a.decided_at) : ''));
     const edit = () => {
       const f = { title: a.title, body: a.body, owner: a.owner, due_date: String(a.due_date).slice(0, 10) };
@@ -36,7 +46,7 @@ export async function render(root) {
   async function decide(id, decision) { await api(`actions/${id}/decide`, { body: { decision, persona: state.persona.id } }); toast(decision === 'approve' ? 'Approved and logged. In demo mode the action is recorded and nothing is sent.' : 'Rejected and logged.'); render(root); document.dispatchEvent(new CustomEvent('astra:navigate', { detail: { screen: 'actions', params: {} } })); }
   const spokenQueue = () => pending.length ? `${pending.length === 1 ? 'One action is' : pending.length + ' actions are'} waiting${total ? ', worth about ' + spokenMoney(total) : ''}. ${pending.slice(0, 4).map((a, i) => `${i + 1}: ${a.title}${a.payload && a.payload.impact ? ', about ' + spokenMoney(a.payload.impact) : ''}.`).join(' ')} Say approve or reject with the number.` : 'Nothing is waiting for approval.';
   root.replaceChildren(
-    screenHead('Action centre', `${pending.length} waiting for approval${total ? ' · worth about ' + F(total, 'money') : ''}${raised ? ` · ${raised} raised by the predictions` : ''} · Approved actions go to Workday, Salesforce, ServiceNow, Teams or Outlook. In demo mode they are recorded and nothing is sent.`,
+    screenHead('Action centre', `${pending.length} waiting for approval${total ? ' · worth about ' + F(total, 'money') : ''}${raised ? ` · ${raised} raised by the predictions` : ''}${inYear ? ` · approving everything waiting adds about ${F(inYear, 'money')} of revenue before year end` : ''} · Approved actions go to Workday, Salesforce, ServiceNow, Teams or Outlook. In demo mode they are recorded and nothing is sent.`,
       h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' } }, h('button', { class: 'btn small', title: 'Read the queue aloud', onClick: () => document.dispatchEvent(new CustomEvent('astra:speak', { detail: spokenQueue() })) }, '▶ Read me the queue'), h('button', { class: 'btn small', onClick: () => ask('What should I do about it?') }, 'Draft actions from the last insight'))),
     h('div', { class: 'grid', style: { gap: '10px' } }, ...(pending.length ? pending.map(card) : [h('div', { class: 'card muted' }, 'No drafts waiting. The predictions raise their own drafts each morning; ask “What should I do about it?” after any insight to draft more.')])),
     done.length ? h('div', { style: { marginTop: '20px' } }, h('div', { class: 'muted small', style: { marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '.05em' } }, `Decided (${done.length})`), h('div', { class: 'grid', style: { gap: '10px' } }, ...done.slice(0, 12).map(card))) : null);
