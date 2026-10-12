@@ -19,4 +19,4 @@ tools/demo-video/*.ttf
 tools/demo-video/*.json
 tools/demo-video/*.txt
 tools/demo-video/*.log
-demo-video/
+/demo-video/
