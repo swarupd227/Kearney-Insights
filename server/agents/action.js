@@ -25,7 +25,7 @@ async function pricingEffect(ids) {
   const P = new engine.Params(); const from = engine.addMonths(engine.LAST_CLOSED, -5);
   const r = await db.one(`SELECT COALESCE(SUM(write_off),0) AS wo, COALESCE(SUM(discount),0) AS disc, COALESCE(SUM(standard_value),0) AS std FROM engagement_months WHERE engagement_id = ANY(${P.add(ids)}) AND month >= ${P.add(from)}`, P.values);
   const excess = Math.max(0, n(r.disc) - 0.10 * n(r.std)); const leak = n(r.wo) + excess; const impact = 0.5 * leak;
-  return { impact, text: `about ${money(impact)} of realisation recovered over the next six months if half of the last six months' write-offs (${money(n(r.wo))}) and discounts above 10% (${money(excess)}) are stopped` };
+  return { impact, text: `Realisation recovered over the next six months if half of the last six months' write-offs (${money(n(r.wo))}) and discounts above 10% (${money(excess)}) are stopped` };
 }
 async function staffingEffect(engId) {
   if (!engId) return null;
@@ -33,30 +33,30 @@ async function staffingEffect(engId) {
   const weeks = Math.max(2, Math.min(12, Math.round((new Date(e.end_date) - new Date(engine.TODAY)) / (7 * 86400000))));
   const lvl = ref.get().levels.find(l => l.id === 'ASSOCIATE'); const local = COST_FACTOR[e.unit] || 1; const hours = 2 * weeks * 45;
   const impact = Math.max(0, hours * lvl.cost_rate * (local - COST_FACTOR.IND));
-  return { impact, text: `about ${money(impact)} lower loaded cost over ${weeks} weeks: two Associate roles (${num(hours)} hours) delivered from India at ${money(lvl.cost_rate * COST_FACTOR.IND)} an hour instead of ${money(lvl.cost_rate * local)}` };
+  return { impact, text: `Lower loaded cost over ${weeks} weeks: two Associate roles (${num(hours)} hours) delivered from India at ${money(lvl.cost_rate * COST_FACTOR.IND)} an hour instead of ${money(lvl.cost_rate * local)}` };
 }
 function retentionEffect(expected, level, label) {
   const cost = REPLACEMENT_COST[level] || 2.5e5; const impact = n(expected) * 0.3 * cost;
-  return { impact, text: `about ${money(impact)} of replacement cost avoided if one in three conversations changes the outcome: ${num(expected)} expected exits in ${label}, ${money(cost)} to replace each ${ref.labelOf('level', level)}` };
+  return { impact, text: `Replacement cost avoided if one in three conversations changes the outcome: ${num(expected)} expected exits in ${label}, ${money(cost)} to replace each ${ref.labelOf('level', level)}` };
 }
 function pipelineEffect(opps) {
   const weighted = opps.reduce((a, o) => a + n(o.value) * n(o.win_prob), 0); const gross = opps.reduce((a, o) => a + n(o.value), 0);
-  return { impact: weighted, text: `${money(weighted)} of weighted value (${money(gross)} gross across ${opps.length} opportunities) back in motion` };
+  return { impact: weighted, text: `Weighted value back in motion: ${money(gross)} gross across ${opps.length} opportunities, weighted by win probability` };
 }
 function cashEffect(invoices) {
   const expected = invoices.reduce((a, i) => a + n(i.amount) * n(i.late_prob), 0); const gross = invoices.reduce((a, i) => a + n(i.amount), 0);
-  return { impact: expected, text: `about ${money(expected)} of the ${money(gross)} outstanding collected within 30 days of the reminder (each invoice weighted by its late-payment probability)` };
+  return { impact: expected, text: `Collected within 30 days of the reminder, from ${money(gross)} outstanding (each invoice weighted by its late-payment probability)` };
 }
 function recoveryEffect(e) {
   const fees = n(e.budget_fees); const m = n(e.margin_at_completion); const impact = Math.max(0, (TARGET_MARGIN - m) * fees);
-  return { impact, text: `${money(impact)} of margin at risk: ${pct(m, 0)} margin at completion against a ${pct(TARGET_MARGIN, 0)} target on ${money(fees)} of fees` };
+  return { impact, text: `Margin at risk: ${pct(m, 0)} margin at completion against a ${pct(TARGET_MARGIN, 0)} target on ${money(fees)} of fees` };
 }
 async function introductionEffect(practiceId, prob) {
   if (!practiceId) return null;
   const P = new engine.Params();
   const r = await db.one(`SELECT AVG(budget_fees) AS fee FROM engagements WHERE practice = ${P.add(practiceId)} AND budget_fees > 0`, P.values);
   const fee = n(r && r.fee); const share = n(prob) || 0.3; const impact = fee * share * 0.3;
-  return { impact, text: `about ${money(impact)} expected: a typical ${ref.labelOf('practice', practiceId)} engagement of ${money(fee)}, ${pct(share, 0)} of similar clients bought it, one in three introductions assumed to convert` };
+  return { impact, text: `Expected from a typical ${ref.labelOf('practice', practiceId)} engagement of ${money(fee)}: ${pct(share, 0)} of similar clients bought it, one in three introductions assumed to convert` };
 }
 async function feesOf(ids) { if (!ids.length) return 0; const P = new engine.Params(); const r = await db.one(`SELECT COALESCE(SUM(budget_fees),0) AS fees FROM engagements WHERE id = ANY(${P.add(ids)})`, P.values); return n(r.fees); }
 
