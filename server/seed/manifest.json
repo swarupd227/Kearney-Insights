@@ -1,5 +1,5 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "random_seed": 20261013,
   "description": "Seed manifest for Astra Insights for Kearney (orals demo). Lists the real constraints the seed must honour and the patterns planted so the five storylines work. Values generated from this manifest are demonstration data and carry the Seeded badge.",
   "clock": { "today": "2026-10-13", "first_month": "2024-01-01", "last_closed_month": "2026-09-01", "fiscal_year": "calendar" },
@@ -22,20 +22,50 @@
     "pyramid": { "PARTNER": 0.082, "AP": 0.06, "PRINCIPAL": 0.13, "MANAGER": 0.21, "ASSOCIATE": 0.31, "BA": 0.208 },
     "unit_rate_factor": { "NA": 1.25, "LATAM": 0.6, "DACH": 1.15, "UKI": 1.15, "FRBNL": 1.05, "NORD": 1.1, "SEUR": 0.85, "CEE": 0.6, "IND": 0.38, "JPN": 1.0, "KOR": 0.55, "GCN": 0.7, "SEA": 0.9, "ANZ": 1.05, "ME": 1.3, "AFR": 0.7, "TUR": 0.55 }
   },
+  "realism": {
+    "description": "Assumptions that keep the seed within the ranges a consulting partner expects. Changed in 1.1.0 after a realism review; the planted patterns below are unaffected.",
+    "invoices": {
+      "description": "Client payment terms of 30, 45 or 60 days; most clients pay around the due date, a tail pays weeks late, a few invoices are chased for months. Target: 20-30% of open invoices overdue, expected value past 90 days in the tens of millions, days past due above 365 rare.",
+      "terms_days": [30, 45, 60], "terms_weights": [50, 35, 15],
+      "pay_delay_mean_days": 2, "pay_delay_sd_days": 14, "chased_share": 0.04, "stuck_share": 0.004
+    },
+    "bench": {
+      "description": "Share of person-months with chargeable hours under 20% of available hours, by level, before the unit multiplier and the August and December seasonal factor (1.3). Over-supply in Southern Europe and Latin America; the Nordics multiplier is consistent with its planted utilisation gap. Target: 3-10% by unit, higher at Business Analyst and Associate.",
+      "monthly_rate_by_level": { "BA": 0.075, "ASSOCIATE": 0.065, "MANAGER": 0.04, "PRINCIPAL": 0.025, "AP": 0.015, "PARTNER": 0.005 },
+      "unit_multiplier": { "SEUR": 1.9, "LATAM": 1.7, "NORD": 1.4 }
+    },
+    "practice_mix": {
+      "description": "Each unit has a persistent practice mix (the firm's practice weights tilted per unit by a lognormal factor); the practice furthest below its share of the unit's run-rate is the most likely to sell next. Engagements sold to fill a small remaining gap are sized to the gap. Target: year-on-year growth of a practice within a unit mostly within -25% to +40%.",
+      "unit_tilt_sigma": 0.35, "max_engagement_share_of_practice": 0.8
+    },
+    "attrition": {
+      "description": "Leavers per year as a share of client-service employees and the regretted share of them, giving regretted attrition near 8% a year. Flight-risk intercepts are set so the six-month expected exits are consistent with that rate.",
+      "leavers_per_year": 0.145, "regretted_share": 0.55
+    },
+    "bookings": {
+      "description": "Share of each future month's run-rate already sold at the demo date (October, November, December 2026), so booked work does not cover the next two quarters' plan on its own.",
+      "visibility_after_last_closed": [0.95, 0.78, 0.55]
+    },
+    "pipeline": {
+      "description": "One opportunity created per this much 2025 revenue (over January 2025 to the demo date), so the weighted pipeline covers about 1.5x of the next two quarters' plan not yet booked (coverage reads as a ratio, not as Covered).",
+      "revenue_per_opportunity_usd": 800000
+    }
+  },
   "planted_patterns": {
     "storyline_A_europe_gap": {
-      "description": "Europe runs behind plan in 2026 with several drivers: the DACH realisation decline, fewer engagement starts in UK and Ireland from June 2026, and low utilisation in the Nordics.",
-      "unit_actual_factor_2026": { "DACH": 0.97, "UKI": 0.94, "NORD": 0.96, "FRBNL": 1.02, "SEUR": 1.03, "CEE": 1.04 },
+      "description": "Europe runs behind plan in 2026 with several drivers: the DACH realisation decline (DACH's volume is on the regional trend; its gap is realisation), fewer engagement starts in UK and Ireland from June 2026 (the largest unit gap in Europe, mostly volume), and low utilisation in the Nordics.",
+      "unit_actual_factor_2026": { "DACH": 1.0, "UKI": 0.94, "NORD": 0.96, "FRBNL": 1.02, "SEUR": 1.03, "CEE": 1.04 },
       "uki_start_slip_from": "2026-06-01",
       "nord_utilisation_gap_points": -8
     },
     "storyline_B_dach_realisation": {
-      "description": "Billing realisation in DACH falls in Q3 2026 (Jul–Sep) against Q2, concentrated in five engagements. Two of them trend to overrun.",
+      "description": "Billing realisation in DACH falls in Q3 2026 (Jul–Sep) against Q2, concentrated in five engagements that run past year end. Two of them trend to overrun: their teams record more hours than the fixed fee covers (hours_over_budget_q3 in Q3, a third of it in Q2), which is what the overrun model picks up; E-1207 is the most likely to overrun in the firm (about 77%, predicted November 2026).",
       "unit": "DACH",
       "quarter": "2026-Q3",
+      "size_multiplier": 3.2,
       "engagements": [
-        { "id": "E-1182", "fee_model": "fixed", "write_off": 0.14, "overrun": 0.18, "discount": 0.06, "trend_overrun": true },
-        { "id": "E-1207", "fee_model": "fixed", "write_off": 0.1, "overrun": 0.14, "discount": 0.05, "trend_overrun": true },
+        { "id": "E-1182", "fee_model": "fixed", "write_off": 0.14, "overrun": 0.18, "discount": 0.06, "trend_overrun": true, "hours_over_budget_q3": 1.12 },
+        { "id": "E-1207", "fee_model": "fixed", "write_off": 0.1, "overrun": 0.14, "discount": 0.05, "trend_overrun": true, "hours_over_budget_q3": 1.1, "leads_overrun": true, "size_factor": 1.8 },
         { "id": "E-1159", "fee_model": "tm", "write_off": 0.1, "overrun": 0.0, "discount": 0.15, "trend_overrun": false },
         { "id": "E-1231", "fee_model": "tm", "write_off": 0.04, "overrun": 0.0, "discount": 0.13, "trend_overrun": false },
         { "id": "E-1244", "fee_model": "fixed", "write_off": 0.06, "overrun": 0.07, "discount": 0.03, "trend_overrun": false }
