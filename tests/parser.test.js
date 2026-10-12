@@ -23,6 +23,8 @@ const cases = [
   ['Which of our top Financial Services clients buy from only one practice?', 'compare', { industry: 'FS' }],
   ['Which invoices are most likely to go past 90 days?', 'predict', {}],
   ['What should I do about it?', 'act', {}],
+  ['Read me the queue', 'action_centre', {}],
+  ['Approve the first action', 'action_centre', {}],
   ['Find me Kearney material on retail pricing in the Middle East', 'knowledge', { unit: 'ME' }]
 ];
 for (const [q, intent, cut, metrics, period, groupBy, compare] of cases) {

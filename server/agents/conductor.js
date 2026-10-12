@@ -132,6 +132,11 @@ async function execute(plan, parsed, persona, memory, tl, context) {
     case 'action_centre': {
       const ord = /\b(second|2nd)\b/.test(t) ? 1 : /\b(third|3rd)\b/.test(t) ? 2 : /\blast\b/.test(t) ? -1 : /\ball\b/.test(t) ? 'all' : 0;
       const verb = /reject|dismiss/.test(t) ? 'reject' : 'approve';
+      if (/read (me )?the queue|decision queue|queue of actions|what('s| is) waiting/.test(t) && !/approve|reject|dismiss|confirm/.test(t)) {
+        await action.refreshQueue().catch(() => {}); const rows = await action.list(persona); const sm = action.summary(rows);
+        const queue = sm.pending.slice(0, 4).map((a, i) => `${i + 1}. ${a.title}${a.payload && a.payload.impact ? ' (about ' + money(a.payload.impact) + ')' : ''}`).join('; ');
+        return { headline: `${sm.text}${queue ? ' ' + queue + '.' : ''}`, spoken: `${sm.text}${queue ? ' ' + queue + '. Say approve or reject with the number.' : ''}`, kind: 'action_centre', screen: 'actions', visual: null, table: null, followUps: ['Approve the first action', 'Reject the first action', 'Open the action centre'] };
+      }
       if (/match|candidate|assignment/.test(t)) {
         const cands = last && last.candidates; if (!cands || !cands.length) return { headline: 'Ask for candidates first, for example "Who can start on a procurement engagement in Riyadh on Monday?", then confirm a match.', spoken: 'Ask for candidates first.', kind: 'action_centre', visual: null, table: null, followUps: ['Who can start on a procurement engagement in Riyadh on Monday?'] };
         const c = ord === -1 ? cands[cands.length - 1] : cands[typeof ord === 'number' ? ord : 0];

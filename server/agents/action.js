@@ -113,6 +113,7 @@ async function draftFromContext(persona, memory) {
 
 // ---- The predictions draft their own actions. Idempotent: an action with the same key that is pending, or was decided in the last week, is not raised again.
 async function refreshQueue() {
+  await db.query(`DELETE FROM actions WHERE status='pending' AND (payload IS NULL OR payload->>'source' IS NULL)`);
   const existing = new Set((await db.query(`SELECT payload->>'key' AS key FROM actions WHERE payload->>'key' IS NOT NULL AND (status='pending' OR decided_at > now() - interval '7 days')`)).map(r => r.key));
   const drafts = [];
   // 1. Engagements likely to overrun

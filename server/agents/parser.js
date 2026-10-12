@@ -78,6 +78,7 @@ function parseIntent(q, parsed) {
   if (/^confirm (share|it|that|this)$/.test(t)) return 'action_centre';
   if (/what (should|can|do) i do|what should we do|draft|propose actions?|recommend(ed)? actions?|fix (it|this)/.test(t)) return 'act';
   if (/approve|reject/.test(t) && /action/.test(t)) return 'action_centre';
+  if (/read (me )?the queue|decision queue|queue of actions|what('s| is) waiting for (my )?(approval|decision)/.test(t)) return 'action_centre';
   if (/what if|what would|scenario|freeze|if we (raise|increase|cut|reduce|lower)|raise rates|rate increase|compare a .*with|happens to (profit|margin|revenue|leverage|utilisation|utilization)|if i (add|roll off|remove)|add one|roll off one|drops? \d+ points|improvement in realisation/.test(t)) return 'simulate';
   if (/what (did|have) the agents (do|done)|agent observatory|observatory|what can the action agent|agent polic|which agents|what the agents/.test(t)) return 'observatory';
   if (/service desk|ticket volumes|tickets by|incidents|help ?desk|applications do fewer|licensed users|adoption/.test(t)) return 'it_service';
