@@ -171,19 +171,22 @@ T.people.filter(p => p.unit === sd.unit && p.level === sd.level).forEach(p => {
     p.weekend_days = R.int(6, 14); p.travel_weeks = R.int(18, 34);
   }
 });
-// Leavers (last 21 months) as additional records, so active headcount still equals Schedule M
+// Leavers (last 21 months) as additional records, so active headcount still equals Schedule M.
+// About 14% of client-service staff leave in a year, 55% of them regretted: regretted attrition near 8% a year.
 const activeCs = T.people.filter(p => p.client_service && p.type === 'employee');
-const leaverCount = Math.round(activeCs.length * 0.14);
+const leaverCount = Math.round(activeCs.length * manifest.realism.attrition.leavers_per_year * 21 / 12);
 for (let i = 0; i < leaverCount; i++) {
   const tmpl = R.pick(activeCs); const office = ref.offices.find(o => o.id === tmpl.office);
   const lv = R.weighted(['BA', 'ASSOCIATE', 'MANAGER', 'PRINCIPAL', 'AP', 'PARTNER'], [22, 34, 22, 14, 5, 3]);
   const p = makePerson(office, 'employee', lv, true);
-  p.status = 'left'; p.left_date = ymd(addDays(TODAY, -R.int(5, 640))); p.regretted = R.chance(0.58);
+  p.status = 'left'; p.left_date = ymd(addDays(TODAY, -R.int(5, 640))); p.regretted = R.chance(manifest.realism.attrition.regretted_share);
   if (p.unit === sd.unit && lv === 'PRINCIPAL') p.regretted = R.chance(0.8);
   T.people.push(p);
 }
-// Flight risk and burnout (model 7 and 8), computed on seeded attributes; no protected attributes used
-const LEVEL_BASE = { PARTNER: -4.4, AP: -3.8, PRINCIPAL: -3.3, MANAGER: -3.0, ASSOCIATE: -2.8, BA: -2.9 };
+// Flight risk and burnout (model 7 and 8), computed on seeded attributes; no protected attributes used.
+// The intercepts are set so the six-month expected regretted exits sum to about 7-8% of headcount a year (a top-tier
+// consultancy's regretted attrition), with the planted Middle East Principal cluster well above that.
+const LEVEL_BASE = { PARTNER: -6.1, AP: -5.5, PRINCIPAL: -5.0, MANAGER: -4.75, ASSOCIATE: -4.5, BA: -4.55 };
 const UNIT_OFFSET = { ME: 0.25, IND: 0.2, UKI: 0.05, NA: 0.0, DACH: -0.05, JPN: -0.3, NORD: -0.15 };
 for (const p of T.people) {
   if (!p.client_service || p.type !== 'employee' || p.status !== 'active') continue;
@@ -273,13 +276,20 @@ function crossBorderOffice(unit) {
   const pool = R.chance(0.7) && sameRegion.length ? sameRegion : hubs;
   return R.weighted(pool, pool.map(o => o.users));
 }
+// Each unit has a persistent practice mix (its practice teams are local), so a practice's revenue inside a unit grows
+// with the unit rather than jumping with every engagement start.
+const unitPracticeShare = {};
+ref.units.forEach(u => { const w = {}; let t = 0; for (const [p, base] of Object.entries(PRACTICE_WEIGHTS)) { w[p] = base * R.lognorm(1, manifest.realism.practice_mix.unit_tilt_sigma); t += w[p]; } for (const p in w) w[p] /= t; unitPracticeShare[u.id] = w; });
 function newEngagement(unit, startMonth, opts = {}) {
   const office = R.chance(0.14) ? crossBorderOffice(unit) : R.pick(officesByUnit[unit]);
   const client = opts.client || pickClientFor(unit);
   const practice = opts.practice || R.weighted(Object.keys(PRACTICE_WEIGHTS), Object.values(PRACTICE_WEIGHTS));
   const duration = opts.duration || R.weighted([2, 3, 4, 5, 6, 7, 8, 10, 12], [6, 10, 14, 14, 13, 10, 8, 5, 3]);
   const avgMonthly = unitRev25[unit] / 12 / Math.max(5, unitCapacity[unit] / 4.6e6) / REAL_BASE; // typical monthly standard value per engagement
-  const monthlyStd = R.lognorm(avgMonthly, 0.55);
+  let monthlyStd = R.lognorm(avgMonthly, 0.5);
+  // an engagement sold to fill a small remaining gap is sized to that gap (small units no longer overshoot their run-rate by a whole
+  // large engagement), and a single engagement is at most a practice's run-rate in the unit (its team is local and finite)
+  if (opts.gap !== undefined) monthlyStd = Math.min(monthlyStd, Math.max(opts.gap * 1.4, avgMonthly * 0.35), Math.max(opts.practiceRunRate * manifest.realism.practice_mix.max_engagement_share_of_practice, avgMonthly * 0.35));
   const budgetFees = monthlyStd * duration * REAL_BASE;
   const blendedRate = 420 * (rateFactor[unit] || 1);
   const budgetHours = budgetFees / (blendedRate * REAL_BASE);
@@ -297,7 +307,7 @@ function newEngagement(unit, startMonth, opts = {}) {
     scope_changes: R.chance(0.25) ? R.int(1, 3) : 0, reuses_asset: R.chance(0.42), expert_calls: R.chance(0.5) ? R.int(1, 12) : 0,
     workstreams, team_size: clamp(Math.round(monthlyStd / (blendedRate * 130)), 2, 18), planted: opts.planted || null, source: 'stub:sap',
     _start: start, _end: end, _duration: duration, _monthlyStd: monthlyStd, _disc: clamp(R.norm(0.05, 0.02), 0, 0.15), _wo: clamp(R.norm(0.02, 0.012), 0, 0.08),
-    _over: feeModel === 'fixed' ? clamp(R.norm(0.02, 0.03), 0, 0.2) : 0, _delay: clamp(R.norm(0.08, 0.03), 0.02, 0.2), _profile: null
+    _over: feeModel === 'fixed' ? clamp(R.norm(0.02, 0.03), 0, 0.2) : 0, _delay: clamp(R.norm(0.12, 0.04), 0.02, 0.25), _profile: null
   };
 }
 function profileFor(e) {
@@ -305,36 +315,61 @@ function profileFor(e) {
   for (let i = 0; i < n; i++) { let s = 1; if (i === 0) s = 0.55; else if (i === n - 1) s = 0.7; else if (i === 1) s = 0.9; w.push(s * clamp(R.norm(1, 0.08), 0.8, 1.2)); }
   return w;
 }
-// Simulate month by month per unit: start engagements until active standard value meets target
+// Simulate month by month per unit: start engagements until active standard value meets target.
+// After the last closed month only part of the run-rate is already sold (booking visibility falls with distance),
+// so the next two quarters' plan is not fully covered by booked work and the pipeline has something to cover.
 const SIM_START = new Date('2023-06-01T00:00:00Z');
 const SIM_END = new Date('2026-12-01T00:00:00Z');
+const visibility = m => { const ahead = monthsBetween(LAST_CLOSED, m); return ahead <= 0 ? 1 : (manifest.realism.bookings.visibility_after_last_closed[ahead - 1] || 0); };
+function choosePractice(unit, active, m, target) {
+  // the practice furthest below its share of the unit's run-rate is the most likely to sell next
+  const byPractice = {}; active.forEach(e => { byPractice[e.practice] = (byPractice[e.practice] || 0) + e._monthlyStd * e._profile[monthsBetween(monthStart(e._start), m)]; });
+  const ps = Object.keys(PRACTICE_WEIGHTS); const share = unitPracticeShare[unit];
+  const practice = R.weighted(ps, ps.map(p => Math.pow(Math.max(share[p] * target - (byPractice[p] || 0), share[p] * target * 0.05), 1.5)));
+  return { practice, practiceRunRate: share[practice] * target };
+}
 for (const u of ref.units) {
   let active = [];
   for (let m = new Date(SIM_START); m <= SIM_END; m = addMonths(m, 1)) {
     active = active.filter(e => monthsBetween(monthStart(e._start), m) < e._duration);
-    const target = unitStdTarget(u.id, m);
+    const target = unitStdTarget(u.id, m) * visibility(m);
     let sum = active.reduce((a, e) => a + e._monthlyStd * e._profile[monthsBetween(monthStart(e._start), m)], 0);
     let guard = 0;
     while (sum < target * 0.98 && guard++ < 400) {
-      const e = newEngagement(u.id, m); e._profile = profileFor(e);
+      const e = newEngagement(u.id, m, { ...choosePractice(u.id, active, m, target), gap: target - sum }); e._profile = profileFor(e);
       active.push(e); engagementsRaw.push(e); sum += e._monthlyStd * e._profile[0];
     }
   }
 }
-// planted DACH engagements: pick five DACH engagements live through Q3 2026, started Mar–Jun 2026, duration >= 6
-const dachCandidates = engagementsRaw.filter(e => e.unit === 'DACH' && e._start >= new Date('2026-02-15T00:00:00Z') && e._start <= new Date('2026-06-20T00:00:00Z') && e._duration >= 6).sort((a, b) => b._monthlyStd - a._monthlyStd);
-planted.engagements.forEach((pe, i) => {
-  const e = dachCandidates[i]; if (!e) return;
-  e.id = pe.id; e.planted = 'storyline_B'; e.fee_model = pe.fee_model; e._plantedQ3 = pe;
-  e._monthlyStd *= 2.2; e.budget_fees = r0(e.budget_fees * 2.2); e.budget_hours = r0(e.budget_hours * 2.2); // make them material
-  if (pe.trend_overrun) { e.scope_changes = Math.max(e.scope_changes, 2); }
-});
-// keep the DACH unit's 2026 standard value on its target: take the std added to the planted engagements away from the other DACH engagements that start in 2026
+// planted DACH engagements: pick five DACH engagements live through Q3 2026 and still running at year end, started Mar–Jun 2026, duration >= 6
+const dachCandidates = engagementsRaw.filter(e => e.unit === 'DACH' && e._start >= new Date('2026-02-15T00:00:00Z') && e._start <= new Date('2026-06-20T00:00:00Z') && e._duration >= 6 && e._end >= new Date('2026-12-15T00:00:00Z')).sort((a, b) => b._monthlyStd - a._monthlyStd);
+// The two trending to overrun take the earliest-started of the largest candidates (most of the budget is consumed by September,
+// so the predicted exhaustion falls in the next quarter); the others take the largest remaining.
+const plantedLive = [];
 {
-  const added = dachCandidates.slice(0, planted.engagements.length).reduce((a, e) => a + (e._plantedQ3 ? e._monthlyStd * (1 - 1 / 2.2) : 0), 0);
-  const others = engagementsRaw.filter(e => e.unit === 'DACH' && !e._plantedQ3 && e._start >= new Date('2026-01-01T00:00:00Z'));
-  const pool = others.reduce((a, e) => a + e._monthlyStd, 0);
-  if (pool > 0) others.forEach(e => { e._monthlyStd *= Math.max(0.5, 1 - added / pool); });
+  const top = dachCandidates.slice(0, planted.engagements.length + 3); const used = new Set(); const mult = planted.size_multiplier || 2.2;
+  const assign = (pe, e) => { used.add(e); e.id = pe.id; e.planted = 'storyline_B'; e.fee_model = pe.fee_model; e._plantedQ3 = pe; plantedLive.push(e);
+    const f = mult * (pe.size_factor || 1); e._sizeMult = f;
+    e._monthlyStd *= f; e.budget_fees = r0(e.budget_fees * f); e.budget_hours = r0(e.budget_hours * f); // make them material
+    if (pe.trend_overrun) { e.scope_changes = Math.max(e.scope_changes, 2); } };
+  const byStart = [...top].sort((a, b) => a._start - b._start);
+  planted.engagements.filter(pe => pe.trend_overrun).sort((a, b) => (b.leads_overrun ? 1 : 0) - (a.leads_overrun ? 1 : 0)).forEach(pe => { const e = byStart.find(x => !used.has(x)); if (e) assign(pe, e); });
+  planted.engagements.filter(pe => !pe.trend_overrun).forEach(pe => { const e = top.find(x => !used.has(x)); if (e) assign(pe, e); });
+}
+// keep the DACH unit's 2026 standard value on its target: take the std added to the planted engagements away from the other DACH
+// engagements active from the month the first planted engagement starts (the months before it are not dragged down)
+let dachShrinkFrom = null; const dachShrinkByMonth = {};
+{
+  dachShrinkFrom = plantedLive.length ? monthStart(plantedLive.reduce((a, e) => (e._start < a ? e._start : a), plantedLive[0]._start)) : null;
+  const others = engagementsRaw.filter(e => e.unit === 'DACH' && !e._plantedQ3 && dachShrinkFrom && e._end >= dachShrinkFrom);
+  // month by month: the standard value the planted engagements add against the standard value the others carry that month
+  const activeStd = (e, m) => { const i = monthsBetween(monthStart(e._start), m); return i >= 0 && i < e._duration ? e._monthlyStd * e._profile[i] : 0; };
+  for (let m = dachShrinkFrom; m && m <= SIM_END; m = addMonths(m, 1)) {
+    const added = plantedLive.reduce((a, e) => a + activeStd(e, m) * (1 - 1 / e._sizeMult), 0);
+    const pool = others.reduce((a, e) => a + activeStd(e, m), 0);
+    dachShrinkByMonth[ymd(m)] = pool > 0 ? Math.max(0.4, 1 - added / pool) : 1;
+  }
+  others.forEach(e => { e._dachShrink = true; });
 }
 // LIC purchase history (storyline C) and peer pattern
 const sc = manifest.planted_patterns.storyline_C_lic_white_space;
@@ -363,7 +398,7 @@ for (const e of engagementsRaw) { if (e.id) continue; do { engSeq++; } while (pl
 const principalsByUnit = {}; T.people.forEach(p => { if (p.level === 'PRINCIPAL' && p.status === 'active') (principalsByUnit[p.unit] = principalsByUnit[p.unit] || []).push(p.id); });
 // monthly economics
 const sb = manifest.planted_patterns.storyline_B_dach_realisation;
-let invSeq = 0;
+let invSeq = 0; const clientTerms = {};
 for (const e of engagementsRaw) {
   e.principal_id = R.pick(principalsByUnit[e.unit] || principalsByUnit.NA);
   const startM = monthStart(e._start);
@@ -373,14 +408,17 @@ for (const e of engagementsRaw) {
   for (let i = 0; i < e._duration; i++) {
     const m = addMonths(startM, i); if (m > LAST_CLOSED) break;
     let std = e._monthlyStd * e._profile[i];
+    if (e._dachShrink && dachShrinkByMonth[ymd(m)] !== undefined) std *= dachShrinkByMonth[ymd(m)];
     const monthKey = m.getUTCMonth() + 1; const y = m.getUTCFullYear();
     if (y === 2026 && sa.unit_actual_factor_2026[e.unit] && sa.unit_actual_factor_2026[e.unit] < 1) { const slip = e.unit === 'UKI' ? (ymd(m) >= sa.uki_start_slip_from ? 0.9 : 1) : sa.unit_actual_factor_2026[e.unit]; std *= slip; }
     let disc = e._disc, wo = e._wo, over = 0, delayRate = e._delay;
     if (e.fee_model === 'fixed' && cumStd + std > budgetStd) over = Math.min(std, cumStd + std - budgetStd) / std * 0.9; // unbillable overrun share
     else over = e._over * (i / e._duration);
-    if (e._plantedQ3 && y === 2026 && monthKey >= 7 && monthKey <= 9) { disc = e._plantedQ3.discount; wo = e._plantedQ3.write_off; over = Math.max(over, e._plantedQ3.overrun); std *= 1.1; }
-    else if (e._plantedQ3 && y === 2026 && monthKey >= 4 && monthKey <= 6) { disc = 0.03; wo = 0.01; over = 0.01; }
-    const hours = std / e.standard_rate;
+    // the engagements trending to overrun record more hours than their standard value (the team over-delivers on a fixed fee)
+    let hoursFactor = 1; const hob = e._plantedQ3 ? (e._plantedQ3.hours_over_budget_q3 || 1) : 1;
+    if (e._plantedQ3 && y === 2026 && monthKey >= 7 && monthKey <= 9) { disc = e._plantedQ3.discount; wo = e._plantedQ3.write_off; over = Math.max(over, e._plantedQ3.overrun); std *= 1.1; hoursFactor = hob; }
+    else if (e._plantedQ3 && y === 2026 && monthKey >= 4 && monthKey <= 6) { disc = 0.03; wo = 0.01; over = 0.01; hoursFactor = 1 + (hob - 1) * 0.35; }
+    const hours = std / e.standard_rate * hoursFactor;
     const discount = std * disc, writeOff = std * wo, overrun = std * over;
     const net = std - discount - writeOff - overrun;
     const delayed = net * delayRate;
@@ -394,14 +432,23 @@ for (const e of engagementsRaw) {
     // invoice for the billed amount
     if (billed > 1000) {
       const client = clientById[e.client_id];
-      const issue = addDays(addMonths(m, 1), R.int(3, 12)); const due = addDays(issue, 30);
-      const payDelay = Math.round(R.norm(18 + client.payment_behaviour * 22, 18)); const paid = addDays(due, Math.max(-10, payDelay));
-      const disputed = R.chance(0.03 + (e._plantedQ3 ? 0.15 : 0));
-      const status = paid <= TODAY && !disputed ? 'paid' : (due < TODAY ? 'overdue' : 'open');
-      const logit = -2.2 + client.payment_behaviour * 1.2 + (billed / 1e6) * 0.3 + ({ MEA: 0.6, APAC: 0.3, EUR: 0, AMER: -0.2 })[e.region] + (disputed ? 2 : 0) + (status === 'overdue' ? 1.2 : 0);
+      // Payment terms are the client's (30, 45 or 60 days). Most clients pay around the due date; a tail pays weeks late,
+      // a few invoices are chased for months, and disputed invoices wait for resolution before they are paid.
+      const inv = manifest.realism.invoices;
+      if (!clientTerms[client.id]) clientTerms[client.id] = R.weighted(inv.terms_days, inv.terms_weights);
+      const issue = addDays(addMonths(m, 1), R.int(3, 12)); const due = addDays(issue, clientTerms[client.id]);
+      let payDelay = Math.round(R.norm(inv.pay_delay_mean_days + client.payment_behaviour * 12, inv.pay_delay_sd_days));
+      const disputed = R.chance(0.02 + (e._plantedQ3 ? 0.15 : 0));
+      if (disputed) payDelay += R.int(30, 150);
+      if (R.chance(inv.chased_share)) payDelay += R.int(45, 150);
+      if (R.chance(inv.stuck_share)) payDelay += R.int(200, 420);
+      const paid = addDays(due, Math.max(-20, payDelay));
+      const status = paid <= TODAY ? 'paid' : (due < TODAY ? 'overdue' : 'open');
+      const daysPastDue = status === 'overdue' ? Math.round((TODAY - due) / 86400000) : 0;
+      const logit = -3.7 + client.payment_behaviour * 1.0 + (billed / 1e6) * 0.3 + ({ MEA: 0.6, APAC: 0.3, EUR: 0, AMER: -0.2 })[e.region] + (disputed ? 1.8 : 0) + (status === 'overdue' ? 0.6 + 0.045 * Math.min(daysPastDue, 90) : 0);
       const lateProb = r2(clamp(sigmoid(logit), 0.01, 0.97));
       const drivers = [];
-      if (client.payment_behaviour > 0.5) drivers.push('Client pays late on average'); if (disputed) drivers.push('Invoice disputed'); if (billed > 800000) drivers.push('Large invoice value'); if (e.region === 'MEA') drivers.push('Regional payment cycle'); if (!drivers.length) drivers.push('No adverse signals');
+      if (client.payment_behaviour > 0.5) drivers.push('Client pays late on average'); if (disputed) drivers.push('Invoice disputed'); if (daysPastDue > 30) drivers.push('Already more than 30 days past due'); if (billed > 800000) drivers.push('Large invoice value'); if (e.region === 'MEA') drivers.push('Regional payment cycle'); if (!drivers.length) drivers.push('No adverse signals');
       T.invoices.push({ id: 'INV-' + String(++invSeq).padStart(6, '0'), engagement_id: e.id, client_id: e.client_id, unit: e.unit, region: e.region, issue_date: ymd(issue), due_date: ymd(due), amount: r0(billed), paid_date: status === 'paid' ? ymd(paid) : null, status, late_prob: lateProb, late_drivers: drivers, disputed, source: 'stub:sap' });
       const em = T.engagement_months[T.engagement_months.length - 1]; if (status === 'paid') em.collected = r0(billed);
     }
@@ -411,7 +458,7 @@ for (const e of engagementsRaw) {
     const elapsed = clamp((TODAY - e._start) / (e._end - e._start), 0.02, 1);
     const burn = cumHours / e.budget_hours;
     const pressure = burn - elapsed;
-    const plantedBoost = e._plantedQ3 && e._plantedQ3.trend_overrun ? 1.6 : 0;
+    const plantedBoost = e._plantedQ3 && e._plantedQ3.trend_overrun ? 0.7 : 0; // the hours over budget and the scope changes carry the prediction; this steadies it
     const logit = -1.2 + 7 * pressure + 0.35 * e.scope_changes + (e.fee_model === 'fixed' ? 0.5 : 0) + plantedBoost;
     e.overrun_prob = r2(clamp(sigmoid(logit), 0.02, 0.98));
     const burnRate = cumHours / Math.max(1, monthsBetween(startM, LAST_CLOSED) + 1);
@@ -443,14 +490,19 @@ for (const u of ref.units) {
   for (const m of MONTHS) {
     const mk = ymd(m);
     const present = ppl.filter(p => p.hire_date <= mk && (!p.left_date || p.left_date >= mk));
-    // relative weights by level target
-    let wsum = 0; const w = present.map(p => { const x = levelById[p.level].util_target * clamp(R.norm(1, 0.18), 0.4, 1.6) * (p.type === 'contractor' ? 0.6 : 1); wsum += x; return x; });
+    // Bench: in any month a few people between assignments record under 20% chargeable hours. More common at the junior
+    // levels, in August and December, and in the units carrying an over-supply (manifest realism.bench).
+    const bench = manifest.realism.bench; const seasonal = m.getUTCMonth() === 7 || m.getUTCMonth() === 11 ? 1.3 : 1;
+    const onBench = present.map(p => p.type === 'employee' && R.chance((bench.monthly_rate_by_level[p.level] || 0) * (bench.unit_multiplier[u.id] || 1) * seasonal));
+    // relative weights by level target; the others carry the unit's hours while someone is on the bench
+    let wsum = 0; const w = present.map((p, i) => { const x = onBench[i] ? levelById[p.level].util_target * 0.08 * R.f() : levelById[p.level].util_target * clamp(R.norm(1, 0.18), 0.4, 1.6) * (p.type === 'contractor' ? 0.6 : 1); wsum += x; return x; });
     const need = (unitHoursByMonth[u.id + '|' + mk] || 0) * 0.86;
     let scale = wsum > 0 ? need / (wsum * 150) : 0;
     if (u.id === 'NORD' && m.getUTCFullYear() === 2026) scale *= 1 + sa.nord_utilisation_gap_points / 100 * 1.3;
     present.forEach((p, i) => {
       const available = 150 + R.int(-20, 14);
       let chargeable = clamp(w[i] * 150 * scale, 0, available * 0.98);
+      if (onBench[i]) chargeable = Math.min(chargeable, available * 0.18 * R.f());
       if (p.level === 'PARTNER') chargeable = Math.min(chargeable, available * 0.6);
       const overtime = p.sustained_weeks >= 4 && monthsBetween(m, LAST_CLOSED) < Math.ceil(p.sustained_weeks / 4.3) ? R.int(90, 130) : R.int(0, 25);
       const due = 4, late = R.chance(0.1 + (p.level === 'PARTNER' ? 0.15 : 0)) ? R.int(1, 2) : 0;
@@ -469,7 +521,7 @@ for (const u of ref.units) {
     const y = m.getUTCFullYear(); let plan;
     if (y <= 2025) { const actual = unitActualRev[u.id + '|' + ymd(m)] || unitRev25[u.id] / 12 * season(m); plan = actual * clamp(R.norm(1.0, 0.03), 0.92, 1.08); }
     else { const base25 = unitActualRev[u.id + '|' + ymd(new Date(Date.UTC(2025, m.getUTCMonth(), 1)))] || unitRev25[u.id] / 12 * season(m); plan = base25 * manifest.scale.plan_growth_2026 * (y === 2027 ? 1.09 : 1); }
-    T.plan.push({ unit: u.id, month: ymd(m), revenue_plan: r0(plan), margin_plan: r2(clamp(R.norm(0.36, 0.02), 0.28, 0.45)), util_target: 0.68, headcount_plan: r0((unitHeadcount[u.id] || 0) * (y === 2026 ? 1.06 : y === 2027 ? 1.12 : 0.95)), collections_plan: r0(plan * 0.97) });
+    T.plan.push({ unit: u.id, month: ymd(m), revenue_plan: r0(plan), margin_plan: r2(clamp(R.norm(0.52, 0.02), 0.44, 0.6)), util_target: 0.68, headcount_plan: r0((unitHeadcount[u.id] || 0) * (y === 2026 ? 1.06 : y === 2027 ? 1.12 : 0.95)), collections_plan: r0(plan * 0.97) });
   }
 }
 const CURRENCIES = [['EUR', 1.08, 0.28], ['GBP', 1.27, 0.06], ['JPY', 0.0067, 0.04], ['INR', 0.012, 0.03], ['SAR', 0.2667, 0.07], ['AED', 0.2723, 0.06], ['AUD', 0.66, 0.03], ['CHF', 1.13, 0.02]];
@@ -483,7 +535,8 @@ const STAGE_LOGIT = { Qualify: -1.3, Propose: -0.6, Negotiate: 0.3, Verbal: 1.4 
 const partnerWinRate = {}; T.people.forEach(p => { if (p.level === 'PARTNER') partnerWinRate[p.id] = clamp(R.norm(0.36, 0.08), 0.15, 0.6); });
 let oppSeq = 0;
 for (const u of ref.units) {
-  const n = Math.round(unitRev25[u.id] / 1.3e6);
+  // enough opportunities that bookings in a year are in the order of the year's engagement starts (book-to-bill near 1)
+  const n = Math.round(unitRev25[u.id] / manifest.realism.pipeline.revenue_per_opportunity_usd);
   for (let i = 0; i < n; i++) {
     const created = addDays(new Date('2025-01-01T00:00:00Z'), R.int(0, 650));
     const isNew = R.chance(0.2);
