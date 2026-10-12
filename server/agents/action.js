@@ -134,7 +134,10 @@ async function refreshQueue() {
   const stalled = room.stalled.filter(o => n(o.value) >= 1e6).slice(0, 8);
   if (stalled.length) drafts.push({ key: 'stalled:firm', action_type: 'pipeline_push', connector: 'Salesforce (tasks to partners)', title: `Next steps on ${stalled.length} stalled opportunities above US$1 million`, owner: 'Partners owning the opportunities', due_date: due(10), effect: pipelineEffect(stalled), model: 'Win probability', evidence: `No activity for 30 days; the largest is ${stalled[0].id} (${stalled[0].client_name || stalled[0].client_id}, ${money(stalled[0].value)})`, ask: 'Which large deals have not moved for 30 days?', body: `A Salesforce task to each owning partner: confirm the next step and its date within two weeks, or move the opportunity to lost so the forecast stays honest. Opportunities: ${stalled.map(o => o.id).join(', ')}.` });
   const inserted = [];
-  for (const d of drafts) { if (existing.has(d.key)) continue; inserted.push(await insert('system', d.evidence, d, { source: 'prediction' })); }
+  for (const d of drafts) {
+    if (existing.has(d.key)) { await db.query(`UPDATE actions SET payload = payload || $2 WHERE status='pending' AND payload->>'key' = $1`, [d.key, JSON.stringify({ impact: d.effect ? Math.round(d.effect.impact) : null, impact_text: d.effect ? d.effect.text : null, evidence: d.evidence || null })]); continue; }
+    inserted.push(await insert('system', d.evidence, d, { source: 'prediction' }));
+  }
   if (inserted.length) await db.query('INSERT INTO audit_log (persona, event, detail) VALUES ($1,$2,$3)', ['system', 'actions_raised', JSON.stringify({ keys: inserted.map(a => a.payload.key), total_impact: inserted.reduce((a, r) => a + n(r.payload.impact), 0) })]);
   return inserted;
 }
