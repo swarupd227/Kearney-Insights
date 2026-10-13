@@ -128,6 +128,7 @@ a { color: var(--accent-2); cursor: pointer; }
 .answer .q { color: var(--muted); font-size: 13px; margin-bottom: 8px; display: flex; gap: 8px; align-items: center; }
 .answer .headline { font-size: 16.5px; line-height: 1.5; }
 .answer .headline strong { color: var(--accent-2); }
+.answer .figures { margin: 6px 0 2px; } .answer .figures summary { cursor: pointer; font-size: 12.5px; color: var(--muted); } .answer .figures summary:hover { color: var(--accent-2); } .answer .figures div { margin-top: 6px; line-height: 1.5; color: var(--muted); }
 .answer .visual-wrap { margin: 14px 0 6px; }
 .timeline { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; align-items: center; }
 .timeline .step { font-size: 11.5px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: 2px 9px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }

@@ -17,6 +17,7 @@ const composer = require('./composer');
 const briefing = require('./briefing');
 const variance = require('./variance');
 const forecast = require('./forecast');
+const interpret = require('./interpret');
 const trend = require('./trend');
 const pipeline = require('./pipeline');
 const engagement = require('./engagement');
@@ -104,13 +105,19 @@ async function ask({ question, personaId, sessionId = 'default', context = {} })
   try { out = await execute(plan, parsed, persona, memory, tl, context); }
   catch (e) { console.error('agent error', e); out = { headline: 'I could not complete that analysis: ' + e.message, spoken: 'Something went wrong in the analysis. Please try a simpler question.', visual: null, table: null, followUps: persona.questions.slice(0, 3), kind: 'error' }; }
   tl.note('Guardian', `Checked access, privacy and citations: ${verdict.result}${plan.redact ? ' (aggregates only)' : ''}`);
-  // optional LLM polish of the spoken answer (numbers checked)
-  let spoken = out.spoken || out.headline;
+  // With a language model: interpret the result for the person asking (finding, so-what, next step), every number checked
+  // against the result; without one, or when the check fails, the template answer stands. The template always travels with the answer.
+  let spoken = out.spoken || out.headline; let interpreted = null;
   const llmOn = await llm.enabled();
-  if (llmOn && spoken && out.kind !== 'chat') { const st = await llm.status(); const allowed = (spoken.match(/\d[\d,.]*/g) || []).map(s => s.replace(/,/g, '')); const p = await llm.polishNarrative(spoken, allowed); spoken = p.text; tl.note('Briefing Agent', `Spoken answer ${p.polished ? 'polished by ' + st.label : 'from template'}; citation check: ${p.citation}`); }
+  if (llmOn && !interpret.skip(out.kind) && out.headline) {
+    const st = await llm.status();
+    const r = await tl.run('Briefing Agent', `Interpreted the result for the ${persona.title} with ${st.label}`, () => interpret.interpret({ question, persona, out, previous: memory.last && memory.last.narrative }).catch(e => ({ citation: 'error: ' + e.message })));
+    if (r && r.text) { interpreted = r; spoken = r.spoken; tl.note('Guardian', `Citation check on the interpretation: ${r.citation}`); }
+    else tl.note('Guardian', `Interpretation not used (${r && r.citation ? r.citation : 'model unavailable'}); the template answer stands`);
+  } else if (llmOn && spoken && out.kind !== 'chat') { const st = await llm.status(); const allowed = (spoken.match(/\d[\d,.]*/g) || []).map(s => s.replace(/,/g, '')); const p = await llm.polishNarrative(spoken, allowed); spoken = p.text; tl.note('Briefing Agent', `Spoken answer ${p.polished ? 'polished by ' + st.label : 'from template'}; citation check: ${p.citation}`); }
   const answer = {
     question, intent: parsed.intent, persona: persona.id, blocked: false,
-    headline: plan.redact ? `${out.headline} (Shown as aggregates: ${plan.redact}.)` : out.headline, spoken, visual: out.visual || null, visual2: out.visual2 || null, table: out.table || null,
+    headline: plan.redact ? `${out.headline} (Shown as aggregates: ${plan.redact}.)` : (interpreted ? interpreted.text : out.headline), spoken, template: interpreted ? out.headline : null, interpreted: !!interpreted, visual: out.visual || null, visual2: out.visual2 || null, table: out.table || null,
     agents: tl.steps, followUps: (out.followUps || []).slice(0, 3), guardian: { result: verdict.result, checks: verdict.checks, reason: plan.redact || null }, lineage: out.lineage || (out.visual && out.visual.lineage) || null,
     seeded: out.seeded !== undefined ? out.seeded : config.demoMode, screen: out.screen || plan.screen || 'canvas', kind: out.kind || plan.kind, model: out.model || null, assumptions: out.assumptions || null, brief: out.brief || null, audio: out.audio || null, extra: out.extra || null, clarify: out.clarify || null,
     duration_ms: Date.now() - t0, usage: llm.takeUsage(), llm: llmOn ? (await llm.status()).label : null, plannedBy: parsed.plannedBy || 'dictionary parser'
